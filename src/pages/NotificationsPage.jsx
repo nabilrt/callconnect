@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import Avatar from '../components/ui/Avatar';
 
 const NotificationsPage = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const { token, socket, user } = useAuth();
+  const { markNotificationAsRead } = useNotifications();
 
   useEffect(() => {
     if (token) {
@@ -117,6 +119,8 @@ const NotificationsPage = () => {
             notif.id === notificationId ? { ...notif, read: true } : notif
           )
         );
+        // Update the sidebar notification badge
+        markNotificationAsRead(notificationId);
       } else {
         console.error('Failed to mark notification as read:', response.status, response.statusText);
       }

@@ -7,6 +7,7 @@ require('dotenv').config();
 
 const { initializeDatabase } = require('./database/db');
 const authRoutes = require('./routes/auth');
+const socialRoutes = require('./routes/social');
 const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
@@ -25,7 +26,14 @@ app.use(express.json());
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Add io to requests for social routes
+app.use((req, res, next) => {
+  req.io = io;
+  next();
+});
+
 app.use('/api/auth', authRoutes);
+app.use('/api/social', authenticateToken, socialRoutes);
 
 initializeDatabase();
 
@@ -76,6 +84,18 @@ io.on('connection', (socket) => {
 
   socket.on('join_room', (roomId) => {
     socket.join(roomId);
+  });
+
+  // Join group room for group chat
+  socket.on('join_group', (groupId) => {
+    socket.join(`group_${groupId}`);
+    console.log(`User ${socket.username} joined group ${groupId}`);
+  });
+
+  // Leave group room
+  socket.on('leave_group', (groupId) => {
+    socket.leave(`group_${groupId}`);
+    console.log(`User ${socket.username} left group ${groupId}`);
   });
 
   socket.on('send_message', (data) => {

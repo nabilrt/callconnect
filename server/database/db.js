@@ -55,7 +55,7 @@ const initializeDatabase = () => {
     db.run(`CREATE TABLE IF NOT EXISTS notifications (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
-      type TEXT NOT NULL CHECK(type IN ('message', 'friend_request', 'friend_accepted', 'friend_rejected')),
+      type TEXT NOT NULL CHECK(type IN ('message', 'friend_request', 'friend_accepted', 'friend_rejected', 'post_like', 'post_comment', 'group_invite', 'group_join')),
       title TEXT NOT NULL,
       message TEXT NOT NULL,
       data TEXT, -- JSON data for additional info
@@ -64,6 +64,139 @@ const initializeDatabase = () => {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`);
 
+    // Posts table for social media posts
+    db.run(`CREATE TABLE IF NOT EXISTS posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      image TEXT DEFAULT NULL,
+      video TEXT DEFAULT NULL,
+      post_type TEXT DEFAULT 'text' CHECK(post_type IN ('text', 'image', 'video')),
+      privacy TEXT DEFAULT 'friends' CHECK(privacy IN ('public', 'friends', 'private')),
+      likes_count INTEGER DEFAULT 0,
+      comments_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    // Post likes table
+    db.run(`CREATE TABLE IF NOT EXISTS post_likes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      post_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(post_id, user_id)
+    )`);
+
+    // Post comments table
+    db.run(`CREATE TABLE IF NOT EXISTS post_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      post_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      comment TEXT NOT NULL,
+      likes_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    // Comment likes table
+    db.run(`CREATE TABLE IF NOT EXISTS comment_likes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      comment_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (comment_id) REFERENCES post_comments(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(comment_id, user_id)
+    )`);
+
+    // Groups table
+    db.run(`CREATE TABLE IF NOT EXISTS groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT NULL,
+      image TEXT DEFAULT NULL,
+      created_by INTEGER NOT NULL,
+      privacy TEXT DEFAULT 'public' CHECK(privacy IN ('public', 'private')),
+      members_count INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    // Group members table
+    db.run(`CREATE TABLE IF NOT EXISTS group_members (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      role TEXT DEFAULT 'member' CHECK(role IN ('admin', 'moderator', 'member')),
+      joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(group_id, user_id)
+    )`);
+
+    // Group messages table for group chat
+    db.run(`CREATE TABLE IF NOT EXISTS group_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL,
+      sender_id INTEGER NOT NULL,
+      message TEXT NOT NULL,
+      message_type TEXT DEFAULT 'text' CHECK(message_type IN ('text', 'image', 'file')),
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+      FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    // Group posts table (posts within groups)
+    db.run(`CREATE TABLE IF NOT EXISTS group_posts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      group_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      content TEXT NOT NULL,
+      image TEXT DEFAULT NULL,
+      video TEXT DEFAULT NULL,
+      post_type TEXT DEFAULT 'text' CHECK(post_type IN ('text', 'image', 'video')),
+      likes_count INTEGER DEFAULT 0,
+      comments_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (group_id) REFERENCES groups(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    // Update users table to include social media profile fields
+    // Check and add columns only if they don't exist
+    db.get("PRAGMA table_info(users)", (err, result) => {
+      if (!err) {
+        db.all("PRAGMA table_info(users)", (err, columns) => {
+          if (!err) {
+            const columnNames = columns.map(col => col.name);
+            
+            if (!columnNames.includes('bio')) {
+              db.run(`ALTER TABLE users ADD COLUMN bio TEXT DEFAULT NULL`);
+            }
+            if (!columnNames.includes('cover_photo')) {
+              db.run(`ALTER TABLE users ADD COLUMN cover_photo TEXT DEFAULT NULL`);
+            }
+            if (!columnNames.includes('location')) {
+              db.run(`ALTER TABLE users ADD COLUMN location TEXT DEFAULT NULL`);
+            }
+            if (!columnNames.includes('website')) {
+              db.run(`ALTER TABLE users ADD COLUMN website TEXT DEFAULT NULL`);
+            }
+            if (!columnNames.includes('birth_date')) {
+              db.run(`ALTER TABLE users ADD COLUMN birth_date DATE DEFAULT NULL`);
+            }
+          }
+        });
+      }
+    });
 
     console.log('Database initialized successfully');
   });
@@ -261,6 +394,323 @@ const markAllNotificationsAsRead = (userId, callback) => {
   db.run(query, [userId], callback);
 };
 
+// ==================== SOCIAL MEDIA FUNCTIONS ====================
+
+// POST FUNCTIONS
+const createPost = (postData, callback) => {
+  const { user_id, content, image, video, post_type, privacy } = postData;
+  const now = new Date().toISOString();
+  const query = `INSERT INTO posts (user_id, content, image, video, post_type, privacy, created_at, updated_at) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(query, [user_id, content, image, video, post_type, privacy, now, now], function(err) {
+    if (callback) {
+      callback(err, { 
+        id: this.lastID, 
+        user_id, 
+        content, 
+        image, 
+        video, 
+        post_type, 
+        privacy,
+        likes_count: 0,
+        comments_count: 0,
+        created_at: now
+      });
+    }
+  });
+};
+
+const getPosts = (userId, limit = 20, callback) => {
+  const query = `
+    SELECT p.*, u.username, u.avatar, u.id as author_id,
+           (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked
+    FROM posts p
+    JOIN users u ON p.user_id = u.id
+    LEFT JOIN friendships f ON (
+      (f.user1_id = ? AND f.user2_id = p.user_id) OR 
+      (f.user2_id = ? AND f.user1_id = p.user_id)
+    )
+    WHERE (p.privacy = 'public' OR p.user_id = ? OR f.id IS NOT NULL)
+    ORDER BY p.created_at DESC
+    LIMIT ?
+  `;
+  db.all(query, [userId, userId, userId, userId, limit], callback);
+};
+
+const getUserPosts = (userId, viewerId, callback) => {
+  const query = `
+    SELECT p.*, u.username, u.avatar, u.id as author_id,
+           (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked
+    FROM posts p
+    JOIN users u ON p.user_id = u.id
+    WHERE p.user_id = ? AND (p.privacy != 'private' OR p.user_id = ?)
+    ORDER BY p.created_at DESC
+  `;
+  db.all(query, [viewerId, userId, viewerId], callback);
+};
+
+const getPost = (postId, userId, callback) => {
+  const query = `
+    SELECT p.*, u.username, u.avatar, u.id as author_id,
+           (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked
+    FROM posts p
+    JOIN users u ON p.user_id = u.id
+    WHERE p.id = ?
+  `;
+  db.get(query, [userId, postId], callback);
+};
+
+const deletePost = (postId, userId, callback) => {
+  const query = `DELETE FROM posts WHERE id = ? AND user_id = ?`;
+  db.run(query, [postId, userId], callback);
+};
+
+// LIKE FUNCTIONS
+const togglePostLike = (postId, userId, callback) => {
+  db.serialize(() => {
+    // Check if like exists
+    db.get(`SELECT id FROM post_likes WHERE post_id = ? AND user_id = ?`, [postId, userId], (err, existingLike) => {
+      if (err) return callback(err);
+
+      const now = new Date().toISOString();
+      
+      if (existingLike) {
+        // Remove like
+        db.run(`DELETE FROM post_likes WHERE post_id = ? AND user_id = ?`, [postId, userId], (deleteErr) => {
+          if (deleteErr) return callback(deleteErr);
+          
+          // Decrement likes count
+          db.run(`UPDATE posts SET likes_count = likes_count - 1 WHERE id = ?`, [postId], (updateErr) => {
+            callback(updateErr, { action: 'unliked', liked: false });
+          });
+        });
+      } else {
+        // Add like
+        db.run(`INSERT INTO post_likes (post_id, user_id, created_at) VALUES (?, ?, ?)`, 
+          [postId, userId, now], (insertErr) => {
+          if (insertErr) return callback(insertErr);
+          
+          // Increment likes count
+          db.run(`UPDATE posts SET likes_count = likes_count + 1 WHERE id = ?`, [postId], (updateErr) => {
+            callback(updateErr, { action: 'liked', liked: true });
+          });
+        });
+      }
+    });
+  });
+};
+
+const getPostLikes = (postId, callback) => {
+  const query = `
+    SELECT pl.*, u.username, u.avatar 
+    FROM post_likes pl
+    JOIN users u ON pl.user_id = u.id
+    WHERE pl.post_id = ?
+    ORDER BY pl.created_at DESC
+  `;
+  db.all(query, [postId], callback);
+};
+
+// COMMENT FUNCTIONS
+const createComment = (commentData, callback) => {
+  const { post_id, user_id, comment } = commentData;
+  const now = new Date().toISOString();
+  
+  db.serialize(() => {
+    // Insert comment
+    db.run(`INSERT INTO post_comments (post_id, user_id, comment, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`, 
+      [post_id, user_id, comment, now, now], function(err) {
+      if (err) return callback(err);
+      
+      const commentId = this.lastID;
+      
+      // Increment comments count
+      db.run(`UPDATE posts SET comments_count = comments_count + 1 WHERE id = ?`, [post_id], (updateErr) => {
+        if (updateErr) return callback(updateErr);
+        
+        // Get the comment with user info
+        db.get(`
+          SELECT pc.*, u.username, u.avatar 
+          FROM post_comments pc
+          JOIN users u ON pc.user_id = u.id
+          WHERE pc.id = ?
+        `, [commentId], callback);
+      });
+    });
+  });
+};
+
+const getComments = (postId, callback) => {
+  const query = `
+    SELECT pc.*, u.username, u.avatar 
+    FROM post_comments pc
+    JOIN users u ON pc.user_id = u.id
+    WHERE pc.post_id = ?
+    ORDER BY pc.created_at ASC
+  `;
+  db.all(query, [postId], callback);
+};
+
+const deleteComment = (commentId, userId, callback) => {
+  db.serialize(() => {
+    // Get comment to find post_id
+    db.get(`SELECT post_id FROM post_comments WHERE id = ? AND user_id = ?`, [commentId, userId], (err, comment) => {
+      if (err || !comment) return callback(err || new Error('Comment not found'));
+      
+      // Delete comment
+      db.run(`DELETE FROM post_comments WHERE id = ? AND user_id = ?`, [commentId, userId], (deleteErr) => {
+        if (deleteErr) return callback(deleteErr);
+        
+        // Decrement comments count
+        db.run(`UPDATE posts SET comments_count = comments_count - 1 WHERE id = ?`, [comment.post_id], callback);
+      });
+    });
+  });
+};
+
+// GROUP FUNCTIONS
+const createGroup = (groupData, callback) => {
+  const { name, description, image, created_by, privacy } = groupData;
+  const now = new Date().toISOString();
+  
+  db.serialize(() => {
+    // Create group
+    db.run(`INSERT INTO groups (name, description, image, created_by, privacy, created_at, updated_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)`, 
+      [name, description, image, created_by, privacy, now, now], function(err) {
+      if (err) return callback(err);
+      
+      const groupId = this.lastID;
+      
+      // Add creator as admin
+      db.run(`INSERT INTO group_members (group_id, user_id, role, joined_at) VALUES (?, ?, 'admin', ?)`,
+        [groupId, created_by, now], (memberErr) => {
+        callback(memberErr, { 
+          id: groupId, 
+          name, 
+          description, 
+          image, 
+          created_by, 
+          privacy,
+          members_count: 1,
+          created_at: now
+        });
+      });
+    });
+  });
+};
+
+const getUserGroups = (userId, callback) => {
+  const query = `
+    SELECT g.*, gm.role, gm.joined_at, u.username as creator_name
+    FROM groups g
+    JOIN group_members gm ON g.id = gm.group_id
+    LEFT JOIN users u ON g.created_by = u.id
+    WHERE gm.user_id = ?
+    ORDER BY g.created_at DESC
+  `;
+  db.all(query, [userId], callback);
+};
+
+const getGroup = (groupId, userId, callback) => {
+  const query = `
+    SELECT g.*, u.username as creator_name, u.avatar as creator_avatar,
+           gm.role as user_role
+    FROM groups g
+    LEFT JOIN users u ON g.created_by = u.id
+    LEFT JOIN group_members gm ON (g.id = gm.group_id AND gm.user_id = ?)
+    WHERE g.id = ?
+  `;
+  db.get(query, [userId, groupId], callback);
+};
+
+const joinGroup = (groupId, userId, callback) => {
+  const now = new Date().toISOString();
+  
+  db.serialize(() => {
+    // Add user to group
+    db.run(`INSERT OR IGNORE INTO group_members (group_id, user_id, joined_at) VALUES (?, ?, ?)`,
+      [groupId, userId, now], (err) => {
+      if (err) return callback(err);
+      
+      // Increment members count
+      db.run(`UPDATE groups SET members_count = members_count + 1 WHERE id = ?`, [groupId], callback);
+    });
+  });
+};
+
+const leaveGroup = (groupId, userId, callback) => {
+  db.serialize(() => {
+    // Remove user from group
+    db.run(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`, [groupId, userId], (err) => {
+      if (err) return callback(err);
+      
+      // Decrement members count
+      db.run(`UPDATE groups SET members_count = members_count - 1 WHERE id = ?`, [groupId], callback);
+    });
+  });
+};
+
+const getGroupMembers = (groupId, callback) => {
+  const query = `
+    SELECT gm.*, u.username, u.avatar, u.email
+    FROM group_members gm
+    JOIN users u ON gm.user_id = u.id
+    WHERE gm.group_id = ?
+    ORDER BY gm.joined_at ASC
+  `;
+  db.all(query, [groupId], callback);
+};
+
+// GROUP MESSAGES FUNCTIONS
+const sendGroupMessage = (groupId, senderId, message, messageType = 'text', callback) => {
+  const now = new Date().toISOString();
+  const query = `INSERT INTO group_messages (group_id, sender_id, message, message_type, created_at) VALUES (?, ?, ?, ?, ?)`;
+  
+  db.run(query, [groupId, senderId, message, messageType, now], function(err) {
+    if (callback) {
+      callback(err, { 
+        id: this.lastID, 
+        group_id: groupId,
+        sender_id: senderId, 
+        message, 
+        message_type: messageType,
+        created_at: now
+      });
+    }
+  });
+};
+
+const getGroupMessages = (groupId, limit = 50, callback) => {
+  const query = `
+    SELECT gm.*, u.username, u.avatar
+    FROM group_messages gm
+    JOIN users u ON gm.sender_id = u.id
+    WHERE gm.group_id = ?
+    ORDER BY gm.created_at DESC
+    LIMIT ?
+  `;
+  db.all(query, [groupId, limit], (err, messages) => {
+    if (callback) {
+      callback(err, messages ? messages.reverse() : []);
+    }
+  });
+};
+
+// PROFILE FUNCTIONS
+const updateUserProfile = (userId, profileData, callback) => {
+  const { bio, location, website, birth_date } = profileData;
+  const now = new Date().toISOString();
+  const query = `UPDATE users SET bio = ?, location = ?, website = ?, birth_date = ?, updated_at = ? WHERE id = ?`;
+  db.run(query, [bio, location, website, birth_date, now, userId], callback);
+};
+
+const updateUserCoverPhoto = (userId, coverPhotoPath, callback) => {
+  const now = new Date().toISOString();
+  const query = `UPDATE users SET cover_photo = ?, updated_at = ? WHERE id = ?`;
+  db.run(query, [coverPhotoPath, now, userId], callback);
+};
+
 
 module.exports = {
   db,
@@ -283,5 +733,27 @@ module.exports = {
   getNotifications,
   getUnreadNotificationsCount,
   markNotificationAsRead,
-  markAllNotificationsAsRead
+  markAllNotificationsAsRead,
+  
+  // Social Media Functions
+  createPost,
+  getPosts,
+  getUserPosts,
+  getPost,
+  deletePost,
+  togglePostLike,
+  getPostLikes,
+  createComment,
+  getComments,
+  deleteComment,
+  createGroup,
+  getUserGroups,
+  getGroup,
+  joinGroup,
+  leaveGroup,
+  getGroupMembers,
+  sendGroupMessage,
+  getGroupMessages,
+  updateUserProfile,
+  updateUserCoverPhoto
 };

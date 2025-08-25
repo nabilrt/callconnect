@@ -3,8 +3,11 @@ import { Routes, Route } from 'react-router-dom';
 import Navigation from '../components/layout/Navigation';
 import Profile from '../components/dashboard/Profile';
 import ContactsList from '../components/dashboard/ContactsList';
+import FeedPage from './FeedPage';
+import ProfilePage from './ProfilePage';
 import FriendsPage from './FriendsPage';
-import DiscoverPage from './DiscoverPage';
+import GroupsPage from './GroupsPage';
+import GroupDetailPage from './GroupDetailPage';
 import MessagesPage from './MessagesPage';
 import NotificationsPage from './NotificationsPage';
 
@@ -31,11 +34,15 @@ const DashboardPage = () => {
       <div className="flex-1">
         {/* Routes */}
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/feed" element={<FeedPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile/:userId" element={<ProfilePage />} />
           <Route path="/friends" element={<FriendsPage />} />
-          <Route path="/discover" element={<DiscoverPage />} />
+          <Route path="/groups" element={<GroupsPage />} />
+          <Route path="/groups/:groupId" element={<GroupDetailPage />} />
           <Route path="/messages" element={<MessagesPage />} />
           <Route path="/notifications" element={<NotificationsPage />} />
+          <Route path="/" element={<FeedPage />} />
         </Routes>
       </div>
     </div>

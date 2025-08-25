@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import Avatar from '../components/ui/Avatar';
@@ -14,35 +14,43 @@ const MessagesPage = () => {
   const { token, socket, onlineUsers } = useAuth();
   const { unreadMessagesByFriend, markMessagesAsRead } = useNotifications();
 
-  useEffect(() => {
-    fetchFriends();
-  }, []);
-
-  useEffect(() => {
-    if (!socket) return;
-
-    // Listen for new messages to refresh previews
-    socket.on('new_message', handleNewMessage);
-
-    return () => {
-      socket.off('new_message');
-    };
-  }, [socket, friends]);
-
-  const handleNewMessage = (messageData) => {
-    // Only refresh if the message involves one of our friends
-    const isRelevant = friends.some(friend => 
-      friend.id === messageData.sender_id || friend.id === messageData.receiver_id
-    );
+  const fetchMessagePreviews = useCallback(async (friendsList) => {
+    if (!token) return;
     
-    if (isRelevant && friends.length > 0) {
-      // Add a small delay to ensure database is updated
-      setTimeout(() => {
-        fetchMessagePreviews(friends);
-      }, 100);
-    }
-  };
+    const previews = new Map();
+    
+    for (const friend of friendsList) {
+      try {
+        const response = await fetch(`http://localhost:3001/api/auth/messages/${friend.id}?limit=1`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
 
+        if (response.ok) {
+          const messages = await response.json();
+          if (messages.length > 0) {
+            const lastMessage = messages[messages.length - 1];
+            // Get current user ID from token
+            const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+            const currentUserId = tokenPayload.userId;
+            
+            const previewData = {
+              lastMessage: lastMessage.message,
+              messageType: lastMessage.message_type || 'text',
+              timestamp: lastMessage.created_at,
+              isFromMe: lastMessage.sender_id === currentUserId
+            };
+            previews.set(friend.id, previewData);
+          }
+        }
+      } catch (error) {
+        console.error(`Error fetching messages for friend ${friend.id}:`, error);
+      }
+    }
+    
+    setConversationPreviews(previews);
+  }, [token]);
 
   const fetchFriends = async () => {
     try {
@@ -65,40 +73,41 @@ const MessagesPage = () => {
     }
   };
 
-  const fetchMessagePreviews = async (friendsList) => {
-    const previews = new Map();
-    
-    for (const friend of friendsList) {
-      try {
-        const response = await fetch(`http://localhost:3001/api/auth/messages/${friend.id}?limit=1`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
+  useEffect(() => {
+    fetchFriends();
+  }, []);
 
-        if (response.ok) {
-          const messages = await response.json();
-          if (messages.length > 0) {
-            const lastMessage = messages[messages.length - 1];
-            // Get current user ID from token
-            const tokenPayload = JSON.parse(atob(token.split('.')[1]));
-            const currentUserId = tokenPayload.userId;
-            
-            previews.set(friend.id, {
-              lastMessage: lastMessage.message,
-              messageType: lastMessage.message_type || 'text',
-              timestamp: lastMessage.created_at,
-              isFromMe: lastMessage.sender_id === currentUserId
-            });
-          }
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewMessageEvent = (messageData) => {
+      console.log('MessagesPage: New message received, updating previews');
+      
+      // Get current friends list from state
+      setFriends(currentFriends => {
+        // Only refresh if the message involves one of our friends
+        const isRelevant = currentFriends.some(friend => 
+          friend.id === messageData.sender_id || friend.id === messageData.receiver_id
+        );
+        
+        if (isRelevant && currentFriends.length > 0) {
+          // Add a small delay to ensure database is updated
+          setTimeout(() => {
+            fetchMessagePreviews(currentFriends);
+          }, 200);
         }
-      } catch (error) {
-        console.error(`Error fetching messages for friend ${friend.id}:`, error);
-      }
-    }
-    
-    setConversationPreviews(previews);
-  };
+        
+        return currentFriends; // Return unchanged friends array
+      });
+    };
+
+    // Listen for new messages to refresh previews
+    socket.on('new_message', handleNewMessageEvent);
+
+    return () => {
+      socket.off('new_message', handleNewMessageEvent);
+    };
+  }, [socket, fetchMessagePreviews]);
 
   const handleChatOpen = (friend) => {
     setSelectedFriend(friend);
