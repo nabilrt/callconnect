@@ -12,6 +12,8 @@ const ChatWindow = ({ friend, onClose }) => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
   const [showFilePreview, setShowFilePreview] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const { user, token, socket, onlineUsers } = useAuth();
@@ -174,45 +176,76 @@ const ChatWindow = ({ friend, onClose }) => {
   };
 
   const sendFile = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || isUploading) return;
+
+    setIsUploading(true);
+    setUploadProgress(0);
 
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('receiverId', friend.id);
 
     try {
-      const response = await fetch('http://localhost:3001/api/auth/upload-message-file', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
+      // Create XMLHttpRequest for progress tracking
+      const xhr = new XMLHttpRequest();
+      
+      // Upload progress handler
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(percentComplete);
+        }
+      };
+
+      // Response handler
+      const uploadPromise = new Promise((resolve, reject) => {
+        xhr.onload = () => {
+          if (xhr.status === 200) {
+            resolve(JSON.parse(xhr.responseText));
+          } else {
+            reject(new Error(`Upload failed with status: ${xhr.status}`));
+          }
+        };
+        
+        xhr.onerror = () => reject(new Error('Upload failed'));
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setMessages(prev => [...prev, {
-          ...data,
-          sender_username: user.username,
-          receiver_username: friend.username
-        }]);
-        
-        // Emit socket event for real-time delivery
-        if (socket) {
-          socket.emit('send_message', {
-            receiverId: friend.id,
-            message: data.message,
-            messageType: data.message_type
-          });
-        }
-        
-        // Clean up
-        setSelectedFile(null);
-        setFilePreview(null);
-        setShowFilePreview(false);
+      // Set up request
+      xhr.open('POST', 'http://localhost:3001/api/auth/upload-message-file');
+      xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+      
+      // Send request
+      xhr.send(formData);
+      
+      // Wait for response
+      const data = await uploadPromise;
+      
+      setMessages(prev => [...prev, {
+        ...data,
+        sender_username: user.username,
+        receiver_username: friend.username
+      }]);
+      
+      // Emit socket event for real-time delivery
+      if (socket) {
+        socket.emit('send_message', {
+          receiverId: friend.id,
+          message: data.message,
+          messageType: data.message_type
+        });
       }
+      
+      // Clean up
+      setSelectedFile(null);
+      setFilePreview(null);
+      setShowFilePreview(false);
+      setUploadProgress(0);
+      
     } catch (error) {
       console.error('Error sending file:', error);
+      // You could add error state here if needed
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -220,6 +253,8 @@ const ChatWindow = ({ friend, onClose }) => {
     setSelectedFile(null);
     setFilePreview(null);
     setShowFilePreview(false);
+    setUploadProgress(0);
+    setIsUploading(false);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -634,21 +669,58 @@ const ChatWindow = ({ friend, onClose }) => {
                 {formatFileSize(selectedFile.size)}
               </div>
               
+              {/* Upload Progress */}
+              {isUploading && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-gray-600">Uploading...</span>
+                    <span className="text-sm text-gray-600">{uploadProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-2 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${uploadProgress}%` }}
+                    ></div>
+                  </div>
+                  {uploadProgress === 100 && (
+                    <div className="flex items-center justify-center mt-2">
+                      <svg className="animate-spin h-4 w-4 text-indigo-600" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span className="ml-2 text-sm text-gray-600">Processing...</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
               {/* Action Buttons */}
               <div className="flex space-x-3">
                 <Button
                   onClick={cancelFileUpload}
                   variant="outline"
                   className="flex-1"
+                  disabled={isUploading}
                 >
                   Cancel
                 </Button>
                 <Button
                   onClick={sendFile}
                   variant="primary"
-                  className="flex-1 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700"
+                  className="flex-1 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isUploading}
                 >
-                  Send File
+                  {isUploading ? (
+                    <div className="flex items-center space-x-2">
+                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Sending...</span>
+                    </div>
+                  ) : (
+                    'Send File'
+                  )}
                 </Button>
               </div>
             </div>
