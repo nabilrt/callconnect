@@ -84,8 +84,27 @@ const ChatWindow = ({ friend, onClose }) => {
   };
 
   const handleNewMessage = (message) => {
-    if (message.sender_id === friend.id || message.receiver_id === friend.id) {
-      setMessages(prev => [...prev, message]);
+    // Only add message if it's between current user and the friend in this chat
+    if ((message.sender_id === friend.id && message.receiver_id === user.id) || 
+        (message.sender_id === user.id && message.receiver_id === friend.id)) {
+      
+      // Check if message already exists to prevent duplicates
+      setMessages(prev => {
+        const messageExists = prev.some(msg => 
+          msg.id === message.id || 
+          (msg.sender_id === message.sender_id && 
+           msg.receiver_id === message.receiver_id && 
+           msg.message === message.message && 
+           Math.abs(new Date(msg.created_at) - new Date(message.created_at)) < 1000)
+        );
+        
+        if (messageExists) {
+          return prev;
+        }
+        
+        return [...prev, message];
+      });
+      
       if (message.sender_id === friend.id) {
         markMessagesAsRead();
       }
@@ -113,15 +132,14 @@ const ChatWindow = ({ friend, onClose }) => {
 
       if (response.ok) {
         const data = await response.json();
-        setMessages(prev => [...prev, {
-          ...data,
-          sender_username: user.username,
-          receiver_username: friend.username
-        }]);
         setNewMessage('');
         
+        // Don't add message locally - it will come through socket event
         if (socket) {
-          socket.emit('send_message', messageData);
+          socket.emit('send_message', {
+            ...messageData,
+            id: data.id // Use the real message ID from the API
+          });
         }
       }
     } catch (error) {
@@ -220,18 +238,14 @@ const ChatWindow = ({ friend, onClose }) => {
       // Wait for response
       const data = await uploadPromise;
       
-      setMessages(prev => [...prev, {
-        ...data,
-        sender_username: user.username,
-        receiver_username: friend.username
-      }]);
-      
+      // Don't add message locally - it will come through socket event
       // Emit socket event for real-time delivery
       if (socket) {
         socket.emit('send_message', {
           receiverId: friend.id,
           message: data.message,
-          messageType: data.message_type
+          messageType: data.message_type,
+          id: data.id // Use the real message ID from the API
         });
       }
       
@@ -272,11 +286,25 @@ const ChatWindow = ({ friend, onClose }) => {
   };
 
   const formatTime = (timestamp) => {
-    return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid timestamp in formatTime:', timestamp);
+      return '';
+    }
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const formatDate = (timestamp) => {
+    if (!timestamp) return '';
     const date = new Date(timestamp);
+    // Check if date is valid
+    if (isNaN(date.getTime())) {
+      console.warn('Invalid timestamp in formatDate:', timestamp);
+      return '';
+    }
+    
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -294,28 +322,14 @@ const ChatWindow = ({ friend, onClose }) => {
     const onlineUser = onlineUsers.get(friend.id);
     if (!onlineUser) return 'Offline';
     
-    switch (onlineUser.status) {
-      case 'online':
-        return 'Online';
-      case 'in-call':
-        return 'In call';
-      default:
-        return 'Offline';
-    }
+    return onlineUser.status === 'online' ? 'Online' : 'Offline';
   };
 
   const getFriendStatusColor = () => {
     const onlineUser = onlineUsers.get(friend.id);
     if (!onlineUser) return 'text-gray-500';
     
-    switch (onlineUser.status) {
-      case 'online':
-        return 'text-green-600';
-      case 'in-call':
-        return 'text-yellow-600';
-      default:
-        return 'text-gray-500';
-    }
+    return onlineUser.status === 'online' ? 'text-green-600' : 'text-gray-500';
   };
 
   const formatFileSize = (bytes) => {
@@ -333,7 +347,7 @@ const ChatWindow = ({ friend, onClose }) => {
       return (
         <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-2xl shadow-sm ${
           isCurrentUser 
-            ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white ml-auto' 
+            ? 'bg-indigo-600 text-white ml-auto' 
             : 'bg-white border border-gray-200 text-gray-900'
         }`}>
           <p className="break-words leading-relaxed">{message.message}</p>
@@ -370,7 +384,7 @@ const ChatWindow = ({ friend, onClose }) => {
             onClick={() => window.open(`http://localhost:3001${fileInfo.filePath}`, '_blank')}
           />
           <div className={`px-3 py-2 ${
-            isCurrentUser ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white' : 'bg-gray-50'
+            isCurrentUser ? 'bg-indigo-600 text-white' : 'bg-gray-50'
           }`}>
             <p className={`text-xs truncate ${isCurrentUser ? 'text-indigo-100' : 'text-gray-600'}`}>
               {fileInfo.originalName}
@@ -392,7 +406,7 @@ const ChatWindow = ({ friend, onClose }) => {
             className="w-full h-auto max-h-64"
           />
           <div className={`px-3 py-2 ${
-            isCurrentUser ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white' : 'bg-gray-50'
+            isCurrentUser ? 'bg-indigo-600 text-white' : 'bg-gray-50'
           }`}>
             <p className={`text-xs truncate ${isCurrentUser ? 'text-indigo-100' : 'text-gray-600'}`}>
               {fileInfo.originalName}
@@ -408,7 +422,7 @@ const ChatWindow = ({ friend, onClose }) => {
     // File type
     return (
       <div className={`${baseClasses} ${
-        isCurrentUser ? 'bg-gradient-to-r from-indigo-500 to-indigo-600 text-white' : 'bg-white'
+        isCurrentUser ? 'bg-indigo-600 text-white' : 'bg-white'
       }`}>
         <div className="p-4 flex items-center space-x-3">
           <div className={`p-2 rounded-lg ${
@@ -482,7 +496,7 @@ const ChatWindow = ({ friend, onClose }) => {
         </div>
 
         {/* Messages Container */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gradient-to-b from-gray-50 to-white">
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
@@ -490,7 +504,7 @@ const ChatWindow = ({ friend, onClose }) => {
           ) : messages.length === 0 ? (
             <div className="flex items-center justify-center h-full text-gray-500">
               <div className="text-center">
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-full p-6 mx-auto w-20 h-20 flex items-center justify-center mb-4">
+                <div className="bg-indigo-50 rounded-full p-6 mx-auto w-20 h-20 flex items-center justify-center mb-4">
                   <svg className="w-10 h-10 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
@@ -605,7 +619,7 @@ const ChatWindow = ({ friend, onClose }) => {
               onClick={sendMessage}
               variant="primary"
               disabled={!newMessage.trim()}
-              className="p-3 rounded-full bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 shadow-lg transform hover:scale-105 transition-all duration-200"
+              className="p-3 rounded-full bg-indigo-600 hover:bg-indigo-700 shadow-lg transform hover:scale-105 transition-all duration-200"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
@@ -678,7 +692,7 @@ const ChatWindow = ({ friend, onClose }) => {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
                     <div 
-                      className="bg-gradient-to-r from-indigo-500 to-indigo-600 h-2 rounded-full transition-all duration-300 ease-out"
+                      className="bg-indigo-600 h-2 rounded-full transition-all duration-300 ease-out"
                       style={{ width: `${uploadProgress}%` }}
                     ></div>
                   </div>
@@ -707,7 +721,7 @@ const ChatWindow = ({ friend, onClose }) => {
                 <Button
                   onClick={sendFile}
                   variant="primary"
-                  className="flex-1 bg-gradient-to-r from-indigo-500 to-indigo-600 hover:from-indigo-600 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   disabled={isUploading}
                 >
                   {isUploading ? (

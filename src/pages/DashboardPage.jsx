@@ -6,9 +6,7 @@ import ContactsList from '../components/dashboard/ContactsList';
 import FriendsPage from './FriendsPage';
 import DiscoverPage from './DiscoverPage';
 import MessagesPage from './MessagesPage';
-import CallInterface from '../components/calling/CallInterface';
-import IncomingCall from '../components/calling/IncomingCall';
-import { useCall } from '../context/CallContext';
+import NotificationsPage from './NotificationsPage';
 
 const HomePage = () => (
   <div className="p-8 max-w-7xl mx-auto">
@@ -24,8 +22,6 @@ const HomePage = () => (
 );
 
 const DashboardPage = () => {
-  const { callStatus } = useCall();
-
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar Navigation */}
@@ -33,30 +29,15 @@ const DashboardPage = () => {
 
       {/* Main Content Area */}
       <div className="flex-1">
-        {/* Status Bar */}
-        {callStatus !== 'idle' && (
-          <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-2">
-            <div className="flex items-center space-x-2 text-sm">
-              <div className={`w-2 h-2 rounded-full animate-pulse ${
-                callStatus === 'connected' ? 'bg-green-500' : 'bg-yellow-500'
-              }`}></div>
-              <span className="text-gray-700 capitalize">{callStatus}</span>
-            </div>
-          </div>
-        )}
-
         {/* Routes */}
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/friends" element={<FriendsPage />} />
           <Route path="/discover" element={<DiscoverPage />} />
           <Route path="/messages" element={<MessagesPage />} />
+          <Route path="/notifications" element={<NotificationsPage />} />
         </Routes>
       </div>
-
-      {/* Call Components */}
-      <CallInterface />
-      <IncomingCall />
     </div>
   );
 };

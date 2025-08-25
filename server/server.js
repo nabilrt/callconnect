@@ -13,7 +13,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
-    origin: "http://localhost:5173",
+    origin: "http://localhost:5174",
     methods: ["GET", "POST"]
   }
 });
@@ -30,7 +30,6 @@ app.use('/api/auth', authRoutes);
 initializeDatabase();
 
 const users = new Map();
-const activeRooms = new Map();
 
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -74,102 +73,34 @@ io.on('connection', (socket) => {
   io.emit('online_users', onlineUsersList);
   console.log('Sent online users to all clients:', onlineUsersList.map(u => u.userId));
 
-  socket.on('call_user', (data) => {
-    const { targetUserId, offer, callType } = data;
-    const targetUser = users.get(targetUserId);
-    
-    if (targetUser) {
-      const roomId = `${socket.userId}-${targetUserId}-${Date.now()}`;
-      activeRooms.set(roomId, {
-        caller: socket.userId,
-        callee: targetUserId,
-        callType,
-        status: 'calling'
-      });
-
-      io.to(targetUser.socketId).emit('incoming_call', {
-        from: socket.userId,
-        fromUsername: socket.username,
-        offer,
-        callType,
-        roomId
-      });
-
-      socket.emit('call_initiated', { roomId, targetUserId });
-    } else {
-      socket.emit('user_unavailable', { targetUserId });
-    }
-  });
-
-  socket.on('answer_call', (data) => {
-    const { roomId, answer, accepted } = data;
-    const room = activeRooms.get(roomId);
-    
-    if (room) {
-      const callerUser = users.get(room.caller);
-      if (accepted) {
-        room.status = 'connected';
-        socket.join(roomId);
-        if (callerUser) {
-          io.to(callerUser.socketId).emit('call_answered', {
-            answer,
-            roomId,
-            accepted: true
-          });
-          users.get(room.caller).status = 'in-call';
-          users.get(room.callee).status = 'in-call';
-        }
-      } else {
-        activeRooms.delete(roomId);
-        if (callerUser) {
-          io.to(callerUser.socketId).emit('call_rejected', { roomId });
-        }
-      }
-    }
-  });
-
-  socket.on('ice_candidate', (data) => {
-    const { roomId, candidate } = data;
-    socket.to(roomId).emit('ice_candidate', { candidate, from: socket.userId });
-  });
-
-  socket.on('end_call', (data) => {
-    const { roomId } = data;
-    const room = activeRooms.get(roomId);
-    
-    if (room) {
-      socket.to(roomId).emit('call_ended', { roomId });
-      activeRooms.delete(roomId);
-      
-      if (users.has(room.caller)) {
-        users.get(room.caller).status = 'online';
-      }
-      if (users.has(room.callee)) {
-        users.get(room.callee).status = 'online';
-      }
-      
-      socket.leave(roomId);
-    }
-  });
 
   socket.on('join_room', (roomId) => {
     socket.join(roomId);
   });
 
   socket.on('send_message', (data) => {
-    const { receiverId, message, messageType = 'text' } = data;
+    const { receiverId, message, messageType = 'text', id } = data;
     const receiverUser = users.get(receiverId);
+    const senderUser = users.get(socket.userId);
     
+    const messageData = {
+      id: id || Date.now(), // Use the real message ID from API if provided
+      sender_id: socket.userId,
+      receiver_id: receiverId,
+      message,
+      message_type: messageType,
+      sender_username: socket.username,
+      created_at: new Date().toISOString()
+    };
+    
+    // Send to receiver
     if (receiverUser) {
-      io.to(receiverUser.socketId).emit('new_message', {
-        id: Date.now(),
-        sender_id: socket.userId,
-        receiver_id: receiverId,
-        message,
-        message_type: messageType,
-        sender_username: socket.username,
-        created_at: new Date().toISOString()
-      });
+      io.to(receiverUser.socketId).emit('new_message', messageData);
+    }
+    
+    // Also send back to sender so their UI updates across all components
+    if (senderUser) {
+      io.to(senderUser.socketId).emit('new_message', messageData);
     }
   });
 
@@ -216,13 +147,6 @@ io.on('connection', (socket) => {
     
     io.emit('online_users', onlineUsersList);
     console.log('Sent updated online users to all clients:', onlineUsersList.map(u => u.userId));
-    
-    for (const [roomId, room] of activeRooms.entries()) {
-      if (room.caller === socket.userId || room.callee === socket.userId) {
-        socket.to(roomId).emit('call_ended', { roomId });
-        activeRooms.delete(roomId);
-      }
-    }
   });
 });
 

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useCall } from '../../context/CallContext';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
 
@@ -9,7 +8,6 @@ const ContactsList = () => {
   const [loading, setLoading] = useState(true);
   
   const { token, socket, onlineUsers } = useAuth();
-  const { makeCall, callStatus } = useCall();
 
   useEffect(() => {
     fetchUsers();
@@ -35,38 +33,18 @@ const ContactsList = () => {
     }
   };
 
-  const handleCall = (userId, callType) => {
-    if (callStatus === 'idle') {
-      makeCall(userId, callType);
-    }
-  };
-
   const getStatusColor = (userId) => {
     const user = onlineUsers.get(userId);
     if (!user) return 'bg-gray-400';
     
-    switch (user.status) {
-      case 'online':
-        return 'bg-green-500';
-      case 'in-call':
-        return 'bg-yellow-500';
-      default:
-        return 'bg-gray-400';
-    }
+    return user.status === 'online' ? 'bg-green-500' : 'bg-gray-400';
   };
 
   const getStatusText = (userId) => {
     const user = onlineUsers.get(userId);
     if (!user) return 'Offline';
     
-    switch (user.status) {
-      case 'online':
-        return 'Online';
-      case 'in-call':
-        return 'In call';
-      default:
-        return 'Offline';
-    }
+    return user.status === 'online' ? 'Online' : 'Offline';
   };
 
   if (loading) {
@@ -120,31 +98,16 @@ const ContactsList = () => {
                 </p>
               </div>
               
-              {/* Call Buttons */}
+              {/* Message Button */}
               <div className="flex items-center space-x-2">
-                {/* Audio Call */}
                 <Button
-                  onClick={() => handleCall(user.id, 'audio')}
                   variant="ghost"
                   size="sm"
                   className="rounded-full p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50"
-                  disabled={callStatus !== 'idle' || !onlineUsers.has(user.id) || onlineUsers.get(user.id)?.status === 'in-call'}
+                  disabled={!onlineUsers.has(user.id)}
                 >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
-                  </svg>
-                </Button>
-                
-                {/* Video Call */}
-                <Button
-                  onClick={() => handleCall(user.id, 'video')}
-                  variant="ghost"
-                  size="sm"
-                  className="rounded-full p-2 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50"
-                  disabled={callStatus !== 'idle' || !onlineUsers.has(user.id) || onlineUsers.get(user.id)?.status === 'in-call'}
-                >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4z"/>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                   </svg>
                 </Button>
               </div>

@@ -16,7 +16,11 @@ const {
   sendMessage,
   getMessages,
   markMessagesAsRead,
-  getUserCallHistory 
+  createNotification,
+  getNotifications,
+  getUnreadNotificationsCount,
+  markNotificationAsRead,
+  markAllNotificationsAsRead
 } = require('../database/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
 
@@ -239,6 +243,25 @@ router.post('/friend-request', authenticateToken, (req, res) => {
     if (err) {
       return res.status(500).json({ error: 'Error sending friend request' });
     }
+
+    // Create notification for the receiver
+    const notificationData = {
+      user_id: receiverId,
+      type: 'friend_request',
+      title: 'New Friend Request',
+      message: `${req.user.username} sent you a friend request`,
+      data: {
+        sender_id: req.user.userId,
+        sender_username: req.user.username
+      }
+    };
+
+    createNotification(notificationData, (notifyErr) => {
+      if (notifyErr) {
+        console.error('Error creating notification:', notifyErr);
+      }
+    });
+
     res.json({ message: 'Friend request sent successfully' });
   });
 });
@@ -262,11 +285,43 @@ router.post('/friend-request/:requestId/respond', authenticateToken, (req, res) 
     return res.status(400).json({ error: 'Invalid status' });
   }
 
-  respondToFriendRequest(requestId, status, (err) => {
+  // First get the friend request details
+  getFriendRequests(req.user.userId, 'received', (err, requests) => {
     if (err) {
-      return res.status(500).json({ error: 'Error responding to friend request' });
+      return res.status(500).json({ error: 'Database error' });
     }
-    res.json({ message: `Friend request ${status} successfully` });
+
+    const request = requests.find(r => r.id == requestId);
+    if (!request) {
+      return res.status(404).json({ error: 'Friend request not found' });
+    }
+
+    respondToFriendRequest(requestId, status, (err) => {
+      if (err) {
+        return res.status(500).json({ error: 'Error responding to friend request' });
+      }
+
+      // Create notification for the sender
+      const notificationData = {
+        user_id: request.sender_id,
+        type: status === 'accepted' ? 'friend_accepted' : 'friend_rejected',
+        title: status === 'accepted' ? 'Friend Request Accepted' : 'Friend Request Declined',
+        message: `${req.user.username} ${status} your friend request`,
+        data: {
+          responder_id: req.user.userId,
+          responder_username: req.user.username,
+          status: status
+        }
+      };
+
+      createNotification(notificationData, (notifyErr) => {
+        if (notifyErr) {
+          console.error('Error creating notification:', notifyErr);
+        }
+      });
+
+      res.json({ message: `Friend request ${status} successfully` });
+    });
   });
 });
 
@@ -293,6 +348,99 @@ router.get('/messages/:friendId', authenticateToken, (req, res) => {
   });
 });
 
+router.get('/messages/unread-count', authenticateToken, (req, res) => {
+  const db = require('../database/db').db;
+  
+  // Get total unread messages count
+  db.get(`
+    SELECT COUNT(*) as totalUnread
+    FROM messages 
+    WHERE receiver_id = ? AND read_status = 0
+  `, [req.user.userId], (err, totalResult) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    // Get unread count by friend
+    db.all(`
+      SELECT sender_id as friend_id, COUNT(*) as unread_count
+      FROM messages 
+      WHERE receiver_id = ? AND read_status = 0
+      GROUP BY sender_id
+    `, [req.user.userId], (err, friendResults) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      
+      res.json({
+        totalUnread: totalResult.totalUnread,
+        unreadByFriend: friendResults
+      });
+    });
+  });
+});
+
+router.patch('/messages/:friendId/mark-read', authenticateToken, (req, res) => {
+  const { friendId } = req.params;
+  const db = require('../database/db').db;
+  
+  db.run(`
+    UPDATE messages 
+    SET read_status = 1 
+    WHERE receiver_id = ? AND sender_id = ? AND read_status = 0
+  `, [req.user.userId, friendId], (err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json({ message: 'Messages marked as read' });
+  });
+});
+
+router.get('/notifications/unread-count', authenticateToken, (req, res) => {
+  getUnreadNotificationsCount(req.user.userId, (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json({ count: result.count || 0 });
+  });
+});
+
+router.get('/notifications', authenticateToken, (req, res) => {
+  getNotifications(req.user.userId, (err, notifications) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    // Parse JSON data field for each notification
+    const processedNotifications = notifications.map(notification => ({
+      ...notification,
+      data: notification.data ? JSON.parse(notification.data) : null
+    }));
+    
+    res.json(processedNotifications);
+  });
+});
+
+router.patch('/notifications/:notificationId/read', authenticateToken, (req, res) => {
+  const { notificationId } = req.params;
+  
+  markNotificationAsRead(notificationId, (err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json({ message: 'Notification marked as read' });
+  });
+});
+
+router.patch('/notifications/mark-all-read', authenticateToken, (req, res) => {
+  markAllNotificationsAsRead(req.user.userId, (err) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    res.json({ message: 'All notifications marked as read' });
+  });
+});
+
 router.post('/messages', authenticateToken, (req, res) => {
   const { receiverId, message, messageType = 'text' } = req.body;
   
@@ -304,6 +452,27 @@ router.post('/messages', authenticateToken, (req, res) => {
     if (err) {
       return res.status(500).json({ error: 'Error sending message' });
     }
+
+    // Create notification for the receiver
+    const notificationData = {
+      user_id: receiverId,
+      type: 'message',
+      title: 'New Message',
+      message: `${req.user.username} sent you a message`,
+      data: {
+        sender_id: req.user.userId,
+        sender_username: req.user.username,
+        message_id: newMessage.id,
+        message_type: messageType
+      }
+    };
+
+    createNotification(notificationData, (notifyErr) => {
+      if (notifyErr) {
+        console.error('Error creating notification:', notifyErr);
+      }
+    });
+
     res.json(newMessage);
   });
 });
@@ -367,14 +536,6 @@ router.post('/messages/:senderId/mark-read', authenticateToken, (req, res) => {
   });
 });
 
-router.get('/call-history', authenticateToken, (req, res) => {
-  getUserCallHistory(req.user.userId, (err, history) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(history);
-  });
-});
 
 router.get('/profile', authenticateToken, (req, res) => {
   getUser('id', req.user.userId, (err, user) => {

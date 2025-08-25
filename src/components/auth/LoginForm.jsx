@@ -37,11 +37,6 @@ const LoginForm = ({ onSwitchToRegister }) => {
 
   return (
     <div className="w-full max-w-md">
-      <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold text-gray-900 mb-2">Welcome Back</h2>
-        <p className="text-gray-600">Sign in to start calling your friends</p>
-      </div>
-
       <form onSubmit={handleSubmit} className="space-y-6">
         {errors.general && (
           <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg">

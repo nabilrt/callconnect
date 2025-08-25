@@ -52,18 +52,18 @@ const initializeDatabase = () => {
       FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
     )`);
 
-    db.run(`CREATE TABLE IF NOT EXISTS call_history (
+    db.run(`CREATE TABLE IF NOT EXISTS notifications (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      caller_id INTEGER NOT NULL,
-      callee_id INTEGER NOT NULL,
-      call_type TEXT NOT NULL CHECK(call_type IN ('audio', 'video')),
-      status TEXT NOT NULL CHECK(status IN ('completed', 'missed', 'rejected')),
-      duration INTEGER DEFAULT 0,
-      started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      ended_at DATETIME DEFAULT NULL,
-      FOREIGN KEY (caller_id) REFERENCES users(id) ON DELETE CASCADE,
-      FOREIGN KEY (callee_id) REFERENCES users(id) ON DELETE CASCADE
+      user_id INTEGER NOT NULL,
+      type TEXT NOT NULL CHECK(type IN ('message', 'friend_request', 'friend_accepted', 'friend_rejected')),
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      data TEXT, -- JSON data for additional info
+      read_status BOOLEAN DEFAULT FALSE,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`);
+
 
     console.log('Database initialized successfully');
   });
@@ -85,13 +85,15 @@ const createUser = (userData, callback) => {
 };
 
 const updateUserAvatar = (userId, avatarPath, callback) => {
-  const query = `UPDATE users SET avatar = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-  db.run(query, [avatarPath, userId], callback);
+  const now = new Date().toISOString();
+  const query = `UPDATE users SET avatar = ?, updated_at = ? WHERE id = ?`;
+  db.run(query, [avatarPath, now, userId], callback);
 };
 
 const updateUserStatus = (userId, status, callback) => {
-  const query = `UPDATE users SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
-  db.run(query, [status, userId], callback);
+  const now = new Date().toISOString();
+  const query = `UPDATE users SET status = ?, updated_at = ? WHERE id = ?`;
+  db.run(query, [status, now, userId], callback);
 };
 
 const getAllUsers = (excludeUserId, callback) => {
@@ -148,9 +150,10 @@ const respondToFriendRequest = (requestId, status, callback) => {
         return callback(err || new Error('Request not found'));
       }
 
+      const now = new Date().toISOString();
       db.run(
-        `UPDATE friend_requests SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-        [status, requestId],
+        `UPDATE friend_requests SET status = ?, updated_at = ? WHERE id = ?`,
+        [status, now, requestId],
         function(updateErr) {
           if (updateErr) {
             return callback(updateErr);
@@ -186,8 +189,9 @@ const removeFriend = (userId, friendId, callback) => {
 };
 
 const sendMessage = (senderId, receiverId, message, messageType = 'text', callback) => {
-  const query = `INSERT INTO messages (sender_id, receiver_id, message, message_type) VALUES (?, ?, ?, ?)`;
-  db.run(query, [senderId, receiverId, message, messageType], function(err) {
+  const now = new Date().toISOString();
+  const query = `INSERT INTO messages (sender_id, receiver_id, message, message_type, created_at) VALUES (?, ?, ?, ?, ?)`;
+  db.run(query, [senderId, receiverId, message, messageType, now], function(err) {
     if (callback) {
       callback(err, { 
         id: this.lastID, 
@@ -195,7 +199,7 @@ const sendMessage = (senderId, receiverId, message, messageType = 'text', callba
         receiver_id: receiverId, 
         message, 
         message_type: messageType,
-        created_at: new Date().toISOString()
+        created_at: now
       });
     }
   });
@@ -230,38 +234,33 @@ const getUnreadMessageCount = (userId, callback) => {
   db.get(query, [userId], callback);
 };
 
-const addCallHistory = (callData, callback) => {
-  const { caller_id, callee_id, call_type, status, duration } = callData;
-  const query = `INSERT INTO call_history (caller_id, callee_id, call_type, status, duration, ended_at) 
-                 VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`;
-  db.run(query, [caller_id, callee_id, call_type, status, duration], callback);
+const createNotification = (notificationData, callback) => {
+  const { user_id, type, title, message, data } = notificationData;
+  const now = new Date().toISOString();
+  const query = `INSERT INTO notifications (user_id, type, title, message, data, created_at) VALUES (?, ?, ?, ?, ?, ?)`;
+  db.run(query, [user_id, type, title, message, JSON.stringify(data), now], callback);
 };
 
-const getUserCallHistory = (userId, callback) => {
-  const query = `
-    SELECT 
-      ch.*,
-      CASE 
-        WHEN ch.caller_id = ? THEN u2.username
-        ELSE u1.username
-      END as other_user,
-      CASE 
-        WHEN ch.caller_id = ? THEN u2.avatar
-        ELSE u1.avatar
-      END as other_avatar,
-      CASE 
-        WHEN ch.caller_id = ? THEN 'outgoing'
-        ELSE 'incoming'
-      END as direction
-    FROM call_history ch
-    JOIN users u1 ON ch.caller_id = u1.id
-    JOIN users u2 ON ch.callee_id = u2.id
-    WHERE ch.caller_id = ? OR ch.callee_id = ?
-    ORDER BY ch.started_at DESC
-    LIMIT 50
-  `;
-  db.all(query, [userId, userId, userId, userId, userId], callback);
+const getNotifications = (userId, callback) => {
+  const query = `SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 50`;
+  db.all(query, [userId], callback);
 };
+
+const getUnreadNotificationsCount = (userId, callback) => {
+  const query = `SELECT COUNT(*) as count FROM notifications WHERE user_id = ? AND read_status = FALSE`;
+  db.get(query, [userId], callback);
+};
+
+const markNotificationAsRead = (notificationId, callback) => {
+  const query = `UPDATE notifications SET read_status = TRUE WHERE id = ?`;
+  db.run(query, [notificationId], callback);
+};
+
+const markAllNotificationsAsRead = (userId, callback) => {
+  const query = `UPDATE notifications SET read_status = TRUE WHERE user_id = ?`;
+  db.run(query, [userId], callback);
+};
+
 
 module.exports = {
   db,
@@ -280,6 +279,9 @@ module.exports = {
   getMessages,
   markMessagesAsRead,
   getUnreadMessageCount,
-  addCallHistory,
-  getUserCallHistory
+  createNotification,
+  getNotifications,
+  getUnreadNotificationsCount,
+  markNotificationAsRead,
+  markAllNotificationsAsRead
 };

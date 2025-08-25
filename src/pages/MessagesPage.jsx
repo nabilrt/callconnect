@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import Avatar from '../components/ui/Avatar';
 import ChatWindow from '../components/chat/ChatWindow';
 
@@ -11,10 +12,36 @@ const MessagesPage = () => {
   const [conversationPreviews, setConversationPreviews] = useState(new Map());
   
   const { token, socket, onlineUsers } = useAuth();
+  const { unreadMessagesByFriend, markMessagesAsRead } = useNotifications();
 
   useEffect(() => {
     fetchFriends();
   }, []);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    // Listen for new messages to refresh previews
+    socket.on('new_message', handleNewMessage);
+
+    return () => {
+      socket.off('new_message');
+    };
+  }, [socket, friends]);
+
+  const handleNewMessage = (messageData) => {
+    // Only refresh if the message involves one of our friends
+    const isRelevant = friends.some(friend => 
+      friend.id === messageData.sender_id || friend.id === messageData.receiver_id
+    );
+    
+    if (isRelevant && friends.length > 0) {
+      // Add a small delay to ensure database is updated
+      setTimeout(() => {
+        fetchMessagePreviews(friends);
+      }, 100);
+    }
+  };
 
 
   const fetchFriends = async () => {
@@ -59,6 +86,7 @@ const MessagesPage = () => {
             
             previews.set(friend.id, {
               lastMessage: lastMessage.message,
+              messageType: lastMessage.message_type || 'text',
               timestamp: lastMessage.created_at,
               isFromMe: lastMessage.sender_id === currentUserId
             });
@@ -75,12 +103,30 @@ const MessagesPage = () => {
   const handleChatOpen = (friend) => {
     setSelectedFriend(friend);
     setShowChat(true);
+    // Mark messages as read when opening chat
+    markMessagesAsRead(friend.id);
   };
 
-  const formatMessagePreview = (message, isFromMe) => {
+  const formatMessagePreview = (message, messageType, isFromMe) => {
     const prefix = isFromMe ? 'You: ' : '';
-    const truncated = message.length > 50 ? message.substring(0, 50) + '...' : message;
-    return prefix + truncated;
+    
+    // Handle different message types
+    let displayText;
+    switch (messageType) {
+      case 'image':
+        displayText = '📷 Photo';
+        break;
+      case 'video':
+        displayText = '🎥 Video';
+        break;
+      case 'file':
+        displayText = '📎 File';
+        break;
+      default:
+        displayText = message.length > 50 ? message.substring(0, 50) + '...' : message;
+    }
+    
+    return prefix + displayText;
   };
 
   const formatTimestamp = (timestamp) => {
@@ -101,28 +147,14 @@ const MessagesPage = () => {
     const user = onlineUsers.get(userId);
     if (!user) return 'bg-gray-400';
     
-    switch (user.status) {
-      case 'online':
-        return 'bg-green-500';
-      case 'in-call':
-        return 'bg-yellow-500';
-      default:
-        return 'bg-gray-400';
-    }
+    return user.status === 'online' ? 'bg-green-500' : 'bg-gray-400';
   };
 
   const getStatusText = (userId) => {
     const user = onlineUsers.get(userId);
     if (!user) return 'Offline';
     
-    switch (user.status) {
-      case 'online':
-        return 'Online';
-      case 'in-call':
-        return 'In call';
-      default:
-        return 'Offline';
-    }
+    return user.status === 'online' ? 'Online' : 'Offline';
   };
 
   if (loading) {
@@ -174,7 +206,9 @@ const MessagesPage = () => {
               <div 
                 key={friend.id}
                 onClick={() => handleChatOpen(friend)}
-                className="flex items-center space-x-4 p-6 hover:bg-gray-50 cursor-pointer transition-colors duration-200"
+                className={`flex items-center space-x-4 p-6 hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${
+                  unreadMessagesByFriend.has(friend.id) ? 'bg-blue-50' : ''
+                }`}
               >
                 <div className="relative">
                   <Avatar 
@@ -199,6 +233,7 @@ const MessagesPage = () => {
                     {conversationPreviews.has(friend.id)
                       ? formatMessagePreview(
                           conversationPreviews.get(friend.id).lastMessage,
+                          conversationPreviews.get(friend.id).messageType,
                           conversationPreviews.get(friend.id).isFromMe
                         )
                       : "Click to start a conversation"
@@ -206,7 +241,12 @@ const MessagesPage = () => {
                   </p>
                 </div>
 
-                <div className="flex items-center">
+                <div className="flex items-center space-x-2">
+                  {unreadMessagesByFriend.has(friend.id) && (
+                    <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                      {unreadMessagesByFriend.get(friend.id)}
+                    </span>
+                  )}
                   <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
@@ -224,6 +264,10 @@ const MessagesPage = () => {
           onClose={() => {
             setShowChat(false);
             setSelectedFriend(null);
+            // Refresh message previews when closing chat to show latest messages
+            if (friends.length > 0) {
+              fetchMessagePreviews(friends);
+            }
           }}
         />
       )}
