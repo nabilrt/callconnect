@@ -144,7 +144,7 @@ const PostCard = ({ post, onLike, onComment, onDelete }) => {
         <div className="flex items-start justify-between">
           <div className="flex items-center space-x-3">
             <Avatar 
-              src={post.avatar}
+              src={post.author_id === user?.id ? user.avatar : post.avatar}
               username={post.username}
               size="md"
             />

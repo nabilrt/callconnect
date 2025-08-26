@@ -10,7 +10,6 @@ import FriendsPage from './FriendsPage';
 import GroupsPage from './GroupsPage';
 import GroupDetailPage from './GroupDetailPage';
 import MessagesPage from './MessagesPage';
-import NotificationsPage from './NotificationsPage';
 
 const HomePage = () => (
   <div className="p-8 max-w-7xl mx-auto">
@@ -42,7 +41,6 @@ const DashboardPage = () => {
           <Route path="/groups" element={<PageTransition><GroupsPage /></PageTransition>} />
           <Route path="/groups/:groupId" element={<PageTransition><GroupDetailPage /></PageTransition>} />
           <Route path="/messages" element={<PageTransition><MessagesPage /></PageTransition>} />
-          <Route path="/notifications" element={<PageTransition><NotificationsPage /></PageTransition>} />
           <Route path="/" element={<PageTransition><FeedPage /></PageTransition>} />
         </Routes>
       </div>

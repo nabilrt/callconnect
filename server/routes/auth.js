@@ -16,11 +16,6 @@ const {
   sendMessage,
   getMessages,
   markMessagesAsRead,
-  createNotification,
-  getNotifications,
-  getUnreadNotificationsCount,
-  markNotificationAsRead,
-  markAllNotificationsAsRead
 } = require('../database/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
 
@@ -79,13 +74,21 @@ const uploadMessageFile = multer({
     fileSize: 50 * 1024 * 1024, // 50MB limit for message files
   },
   fileFilter: (req, file, cb) => {
+    console.log('File filter check:', {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size
+    });
+    
     // Allow images, videos, documents, and other common file types
-    const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi|pdf|doc|docx|txt|zip|rar/;
+    const allowedTypes = /jpeg|jpg|png|gif|mp4|mov|avi|webm|mkv|flv|wmv|pdf|doc|docx|txt|zip|rar/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     
     if (extname) {
+      console.log('File type allowed:', file.originalname);
       return cb(null, true);
     } else {
+      console.log('File type not supported:', file.originalname, path.extname(file.originalname));
       cb(new Error('File type not supported'));
     }
   }
@@ -396,50 +399,10 @@ router.patch('/messages/:friendId/mark-read', authenticateToken, (req, res) => {
   });
 });
 
-router.get('/notifications/unread-count', authenticateToken, (req, res) => {
-  getUnreadNotificationsCount(req.user.userId, (err, result) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json({ count: result.count || 0 });
-  });
-});
 
-router.get('/notifications', authenticateToken, (req, res) => {
-  getNotifications(req.user.userId, (err, notifications) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    
-    // Parse JSON data field for each notification
-    const processedNotifications = notifications.map(notification => ({
-      ...notification,
-      data: notification.data ? JSON.parse(notification.data) : null
-    }));
-    
-    res.json(processedNotifications);
-  });
-});
 
-router.patch('/notifications/:notificationId/read', authenticateToken, (req, res) => {
-  const { notificationId } = req.params;
-  
-  markNotificationAsRead(notificationId, (err) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json({ message: 'Notification marked as read' });
-  });
-});
 
-router.patch('/notifications/mark-all-read', authenticateToken, (req, res) => {
-  markAllNotificationsAsRead(req.user.userId, (err) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json({ message: 'All notifications marked as read' });
-  });
-});
+
 
 router.post('/messages', authenticateToken, (req, res) => {
   const { receiverId, message, messageType = 'text' } = req.body;
@@ -453,38 +416,48 @@ router.post('/messages', authenticateToken, (req, res) => {
       return res.status(500).json({ error: 'Error sending message' });
     }
 
-    // Create notification for the receiver
-    const notificationData = {
-      user_id: receiverId,
-      type: 'message',
-      title: 'New Message',
-      message: `${req.user.username} sent you a message`,
-      data: {
-        sender_id: req.user.userId,
-        sender_username: req.user.username,
-        message_id: newMessage.id,
-        message_type: messageType
-      }
-    };
-
-    createNotification(notificationData, (notifyErr) => {
-      if (notifyErr) {
-        console.error('Error creating notification:', notifyErr);
-      }
-    });
 
     res.json(newMessage);
   });
 });
 
-router.post('/upload-message-file', authenticateToken, uploadMessageFile.single('file'), (req, res) => {
+router.post('/upload-message-file', authenticateToken, (req, res) => {
+  uploadMessageFile.single('file')(req, res, (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
+      }
+      if (err.message === 'File type not supported') {
+        return res.status(400).json({ error: 'File type not supported. Allowed: images, videos, documents.' });
+      }
+      return res.status(400).json({ error: err.message || 'File upload failed' });
+    }
+    
+    // Continue with the original handler
   try {
+    console.log('Upload route hit:', {
+      file: req.file ? 'present' : 'missing',
+      body: req.body,
+      user: req.user.userId
+    });
+
     if (!req.file) {
+      console.log('No file in request');
       return res.status(400).json({ error: 'No file uploaded' });
     }
 
+    console.log('File details:', {
+      originalname: req.file.originalname,
+      filename: req.file.filename,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      path: req.file.path
+    });
+
     const { receiverId } = req.body;
     if (!receiverId) {
+      console.log('No receiverId in request body');
       return res.status(400).json({ error: 'Receiver ID is required' });
     }
 
@@ -505,13 +478,18 @@ router.post('/upload-message-file', authenticateToken, uploadMessageFile.single(
       messageType = 'video';
     }
 
+    console.log('Sending message with type:', messageType);
+
     // Store file info as JSON string in message
     const messageContent = JSON.stringify(fileInfo);
     
     sendMessage(req.user.userId, receiverId, messageContent, messageType, (err, newMessage) => {
       if (err) {
+        console.error('Error in sendMessage:', err);
         return res.status(500).json({ error: 'Error sending file message' });
       }
+      
+      console.log('Message sent successfully:', newMessage);
       
       // Parse the message back to include file info
       newMessage.fileInfo = fileInfo;
@@ -523,6 +501,7 @@ router.post('/upload-message-file', authenticateToken, uploadMessageFile.single(
     console.error('File upload error:', error);
     res.status(500).json({ error: 'Server error during file upload' });
   }
+  });
 });
 
 router.post('/messages/:senderId/mark-read', authenticateToken, (req, res) => {

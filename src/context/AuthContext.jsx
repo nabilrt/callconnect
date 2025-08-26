@@ -149,6 +149,7 @@ export const AuthProvider = ({ children }) => {
     setOnlineUsers(new Map());
     localStorage.removeItem('user');
     localStorage.removeItem('token');
+    window.location.href = '/';
   };
 
   const updateAvatar = async (file) => {

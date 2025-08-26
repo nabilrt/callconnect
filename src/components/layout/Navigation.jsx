@@ -1,13 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useNotifications } from '../../context/NotificationContext';
 import Logo from '../ui/Logo';
 import Avatar from '../ui/Avatar';
 
 const Navigation = () => {
   const { logout, user } = useAuth();
-  const { unreadMessagesCount, unreadNotificationsCount } = useNotifications();
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -17,6 +15,7 @@ const Navigation = () => {
     {
       path: '/feed',
       name: 'Feed',
+      activePaths: ['/feed', '/'],
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2 2z" />
@@ -27,6 +26,7 @@ const Navigation = () => {
     {
       path: '/friends',
       name: 'Friends',
+      activePaths: ['/friends'],
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -36,9 +36,10 @@ const Navigation = () => {
     {
       path: '/groups',
       name: 'Groups',
+      activePaths: ['/groups'],
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 515.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       )
     }
@@ -53,19 +54,16 @@ const Navigation = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
       ),
-      notificationCount: unreadMessagesCount
     },
-    {
-      path: '/notifications',
-      name: 'Notifications',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-        </svg>
-      ),
-      notificationCount: unreadNotificationsCount
-    }
   ];
+
+  // Helper function to check if a nav item is active
+  const isNavItemActive = (item) => {
+    if (item.activePaths) {
+      return item.activePaths.includes(location.pathname);
+    }
+    return location.pathname === item.path;
+  };
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -102,39 +100,42 @@ const Navigation = () => {
 
           {/* Center Section - Main Navigation */}
           <div className="hidden md:flex items-center space-x-2">
-            {navItems.map((item, index) => (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                className={({ isActive }) =>
-                  `relative p-4 mx-2 rounded-xl transition-all duration-300 ease-in-out group transform hover:scale-105 ${
-                    isActive
-                      ? 'text-indigo-600 bg-indigo-50 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
-                  }`
-                }
-                title={item.name}
-                style={{
-                  transitionDelay: `${index * 50}ms`
-                }}
-              >
-                <div className="transition-transform duration-300 ease-in-out group-hover:scale-110">
-                  {item.icon}
-                </div>
-                {/* Active indicator */}
-                <div 
-                  className={`absolute bottom-1 left-1/2 transform -translate-x-1/2 h-1 bg-indigo-600 rounded-full transition-all duration-500 ease-out ${
-                    item.path === location.pathname ? 'w-8 opacity-100' : 'w-0 opacity-0'
-                  }`} 
-                />
-                {/* Hover indicator */}
-                <div 
-                  className={`absolute bottom-1 left-1/2 transform -translate-x-1/2 h-1 bg-gray-400 rounded-full transition-all duration-300 ease-out ${
-                    item.path !== location.pathname ? 'group-hover:w-6 group-hover:opacity-60' : 'w-0 opacity-0'
-                  }`} 
-                />
-              </NavLink>
-            ))}
+            {navItems.map((item, index) => {
+              const isActive = isNavItemActive(item);
+              return (
+                <NavLink
+                  key={item.path}
+                  to={item.path}
+                  className={
+                    `relative p-4 mx-2 rounded-xl transition-all duration-300 ease-in-out group transform hover:scale-105 ${
+                      isActive
+                        ? 'text-indigo-600 bg-indigo-50 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                    }`
+                  }
+                  title={item.name}
+                  style={{
+                    transitionDelay: `${index * 50}ms`
+                  }}
+                >
+                  <div className="transition-transform duration-300 ease-in-out group-hover:scale-110">
+                    {item.icon}
+                  </div>
+                  {/* Active indicator */}
+                  <div 
+                    className={`absolute bottom-1 left-1/2 transform -translate-x-1/2 h-1 bg-indigo-600 rounded-full transition-all duration-500 ease-out ${
+                      isActive ? 'w-8 opacity-100' : 'w-0 opacity-0'
+                    }`} 
+                  />
+                  {/* Hover indicator */}
+                  <div 
+                    className={`absolute bottom-1 left-1/2 transform -translate-x-1/2 h-1 bg-gray-400 rounded-full transition-all duration-300 ease-out ${
+                      !isActive ? 'group-hover:w-6 group-hover:opacity-60' : 'w-0 opacity-0'
+                    }`} 
+                  />
+                </NavLink>
+              );
+            })}
           </div>
 
           {/* Right Section - Actions and Profile */}
@@ -159,13 +160,6 @@ const Navigation = () => {
                 >
                   <div className="relative transition-transform duration-300 ease-in-out group-hover:scale-105">
                     {item.icon}
-                    {item.notificationCount > 0 && (
-                      <div className="absolute -top-2 -right-2 min-w-[20px] h-5 bg-red-500 rounded-full flex items-center justify-center transform transition-all duration-300 ease-out group-hover:scale-110 animate-pulse">
-                        <span className="text-xs text-white font-bold px-1">
-                          {item.notificationCount > 99 ? '99+' : item.notificationCount}
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </NavLink>
               ))}

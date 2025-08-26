@@ -14,7 +14,7 @@ const GroupDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(true);
   const [showChat, setShowChat] = useState(false);
-  const { token, socket } = useAuth();
+  const { token, socket, user } = useAuth();
 
   useEffect(() => {
     if (groupId) {
@@ -152,7 +152,7 @@ const GroupDetailPage = () => {
   };
 
   const handleNewGroupPost = (newPost) => {
-    if (parseInt(newPost.group_id) === parseInt(groupId)) {
+    if (parseInt(newPost.group_id) === parseInt(groupId) && newPost.user_id !== user?.id) {
       setPosts(prev => [newPost, ...prev]);
     }
   };

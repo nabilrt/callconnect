@@ -4,8 +4,63 @@ const path = require('path');
 const dbPath = path.join(__dirname, 'calling_app.db');
 const db = new sqlite3.Database(dbPath);
 
+const runMigrations = () => {
+  // Check if messages table exists and has video support
+  db.get("PRAGMA table_info(messages)", (err, row) => {
+    if (err) {
+      console.log('Error checking table info:', err);
+      return;
+    }
+    
+    // Check current constraint by trying to insert a video message
+    db.get("SELECT sql FROM sqlite_master WHERE type='table' AND name='messages'", (err, result) => {
+      if (err) {
+        console.log('Error getting table schema:', err);
+        return;
+      }
+      
+      if (result && result.sql && !result.sql.includes("'video'")) {
+        console.log('Migrating messages table to support video message type...');
+        
+        // SQLite doesn't support ALTER TABLE with CHECK constraints directly
+        // We need to recreate the table
+        db.serialize(() => {
+          // Create backup table
+          db.run(`CREATE TABLE messages_backup AS SELECT * FROM messages`);
+          
+          // Drop original table
+          db.run(`DROP TABLE messages`);
+          
+          // Create new table with video support
+          db.run(`CREATE TABLE messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER NOT NULL,
+            receiver_id INTEGER NOT NULL,
+            message TEXT NOT NULL,
+            message_type TEXT DEFAULT 'text' CHECK(message_type IN ('text', 'image', 'video', 'file')),
+            read_status BOOLEAN DEFAULT FALSE,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+          )`);
+          
+          // Restore data
+          db.run(`INSERT INTO messages SELECT * FROM messages_backup`);
+          
+          // Drop backup table
+          db.run(`DROP TABLE messages_backup`);
+          
+          console.log('Messages table migration completed.');
+        });
+      }
+    });
+  });
+};
+
 const initializeDatabase = () => {
   db.serialize(() => {
+    // Run migrations first
+    runMigrations();
     db.run(`CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       username TEXT UNIQUE NOT NULL,
@@ -45,7 +100,7 @@ const initializeDatabase = () => {
       sender_id INTEGER NOT NULL,
       receiver_id INTEGER NOT NULL,
       message TEXT NOT NULL,
-      message_type TEXT DEFAULT 'text' CHECK(message_type IN ('text', 'image', 'file')),
+      message_type TEXT DEFAULT 'text' CHECK(message_type IN ('text', 'image', 'video', 'file')),
       read_status BOOLEAN DEFAULT FALSE,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -475,6 +530,7 @@ const createPost = (postData, callback) => {
 const getPosts = (userId, limit = 20, callback) => {
   const query = `
     SELECT p.*, u.username, u.avatar, u.id as author_id,
+           p.likes_count,
            (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked,
            sp.id as shared_id, sp.content as shared_content, sp.image as shared_image, 
            sp.video as shared_video, sp.post_type as shared_post_type,
@@ -497,6 +553,7 @@ const getPosts = (userId, limit = 20, callback) => {
 const getUserPosts = (userId, viewerId, callback) => {
   const query = `
     SELECT p.*, u.username, u.avatar, u.id as author_id,
+           p.likes_count,
            (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked,
            sp.id as shared_id, sp.content as shared_content, sp.image as shared_image, 
            sp.video as shared_video, sp.post_type as shared_post_type,
@@ -514,6 +571,7 @@ const getUserPosts = (userId, viewerId, callback) => {
 const getPost = (postId, userId, callback) => {
   const query = `
     SELECT p.*, u.username, u.avatar, u.id as author_id,
+           p.likes_count,
            (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked,
            sp.id as shared_id, sp.content as shared_content, sp.image as shared_image, 
            sp.video as shared_video, sp.post_type as shared_post_type,
@@ -674,6 +732,21 @@ const getUserGroups = (userId, callback) => {
     JOIN group_members gm ON g.id = gm.group_id
     LEFT JOIN users u ON g.created_by = u.id
     WHERE gm.user_id = ?
+    ORDER BY g.created_at DESC
+  `;
+  db.all(query, [userId], callback);
+};
+
+const getAllGroups = (userId, callback) => {
+  const query = `
+    SELECT g.*, 
+           u.username as creator_name,
+           gm.role as user_role,
+           gm.joined_at,
+           (SELECT COUNT(*) FROM group_members WHERE group_id = g.id) as members_count
+    FROM groups g
+    LEFT JOIN users u ON g.created_by = u.id
+    LEFT JOIN group_members gm ON (g.id = gm.group_id AND gm.user_id = ?)
     ORDER BY g.created_at DESC
   `;
   db.all(query, [userId], callback);
@@ -1014,6 +1087,110 @@ const deleteGroupPost = (postId, userId, callback) => {
   });
 };
 
+// ==================== GROUP POST LIKES FUNCTIONS ====================
+
+const toggleGroupPostLike = (postId, userId, callback) => {
+  db.serialize(() => {
+    // Check if like exists
+    db.get(`SELECT id FROM group_post_likes WHERE post_id = ? AND user_id = ?`, [postId, userId], (err, existingLike) => {
+      if (err) return callback(err);
+
+      const now = new Date().toISOString();
+      
+      if (existingLike) {
+        // Remove like
+        db.run(`DELETE FROM group_post_likes WHERE post_id = ? AND user_id = ?`, [postId, userId], (deleteErr) => {
+          if (deleteErr) return callback(deleteErr);
+          
+          // Decrement likes count
+          db.run(`UPDATE group_posts SET likes_count = likes_count - 1 WHERE id = ?`, [postId], (updateErr) => {
+            callback(updateErr, { action: 'unliked', liked: false });
+          });
+        });
+      } else {
+        // Add like
+        db.run(`INSERT INTO group_post_likes (post_id, user_id, created_at) VALUES (?, ?, ?)`, 
+          [postId, userId, now], (insertErr) => {
+          if (insertErr) return callback(insertErr);
+          
+          // Increment likes count
+          db.run(`UPDATE group_posts SET likes_count = likes_count + 1 WHERE id = ?`, [postId], (updateErr) => {
+            callback(updateErr, { action: 'liked', liked: true });
+          });
+        });
+      }
+    });
+  });
+};
+
+// ==================== GROUP POST COMMENTS FUNCTIONS ====================
+
+const createGroupPostComment = (commentData, callback) => {
+  const { post_id, user_id, content } = commentData;
+  const now = new Date().toISOString();
+
+  db.serialize(() => {
+    db.run(
+      `INSERT INTO group_post_comments (post_id, user_id, content, created_at) VALUES (?, ?, ?, ?)`,
+      [post_id, user_id, content, now],
+      function(err) {
+        if (err) return callback(err);
+        
+        const commentId = this.lastID;
+        
+        // Increment comments count
+        db.run(`UPDATE group_posts SET comments_count = comments_count + 1 WHERE id = ?`, [post_id], (updateErr) => {
+          if (updateErr) return callback(updateErr);
+          
+          // Get the created comment with user info
+          db.get(`
+            SELECT c.*, u.username, u.avatar 
+            FROM group_post_comments c
+            JOIN users u ON c.user_id = u.id 
+            WHERE c.id = ?
+          `, [commentId], (selectErr, comment) => {
+            callback(selectErr, comment);
+          });
+        });
+      }
+    );
+  });
+};
+
+const getGroupPostComments = (postId, callback) => {
+  const query = `
+    SELECT c.*, u.username, u.avatar
+    FROM group_post_comments c
+    JOIN users u ON c.user_id = u.id
+    WHERE c.post_id = ?
+    ORDER BY c.created_at ASC
+  `;
+  db.all(query, [postId], callback);
+};
+
+const deleteGroupPostComment = (commentId, userId, callback) => {
+  db.serialize(() => {
+    // First get comment info to check ownership and get post_id
+    db.get(`SELECT user_id, post_id FROM group_post_comments WHERE id = ?`, [commentId], (err, comment) => {
+      if (err) return callback(err);
+      if (!comment) return callback(new Error('Comment not found'));
+      
+      // Check if user owns the comment
+      if (comment.user_id !== userId) {
+        return callback(new Error('Permission denied'));
+      }
+      
+      // Delete comment
+      db.run(`DELETE FROM group_post_comments WHERE id = ?`, [commentId], (deleteErr) => {
+        if (deleteErr) return callback(deleteErr);
+        
+        // Decrement comments count
+        db.run(`UPDATE group_posts SET comments_count = comments_count - 1 WHERE id = ?`, [comment.post_id], callback);
+      });
+    });
+  });
+};
+
 
 module.exports = {
   db,
@@ -1051,6 +1228,7 @@ module.exports = {
   deleteComment,
   createGroup,
   getUserGroups,
+  getAllGroups,
   getGroup,
   joinGroup,
   leaveGroup,
@@ -1074,5 +1252,9 @@ module.exports = {
   createGroupPost,
   getGroupPost,
   getGroupPosts,
-  deleteGroupPost
+  deleteGroupPost,
+  toggleGroupPostLike,
+  createGroupPostComment,
+  getGroupPostComments,
+  deleteGroupPostComment
 };

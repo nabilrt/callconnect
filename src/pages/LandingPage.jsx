@@ -487,23 +487,23 @@ const LandingPage = () => {
             <div>
               <h3 className="text-lg font-semibold mb-4 font-manrope">Quick Links</h3>
               <ul className="space-y-3">
-                <li><a href="#features" className="text-gray-400 hover:text-white transition-colors">Features</a></li>
-                <li><a href="#about" className="text-gray-400 hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#contact" className="text-gray-400 hover:text-white transition-colors">Contact</a></li>
-                <li><a href="#help" className="text-gray-400 hover:text-white transition-colors">Help Center</a></li>
+                <li><a href="/features" className="text-gray-400 hover:text-white transition-colors">Features</a></li>
+                <li><a href="/about" className="text-gray-400 hover:text-white transition-colors">About Us</a></li>
+                <li><a href="/contact" className="text-gray-400 hover:text-white transition-colors">Contact</a></li>
+                <li><a href="/help" className="text-gray-400 hover:text-white transition-colors">Help Center</a></li>
+                <li><a href="/security" className="text-gray-400 hover:text-white transition-colors">Security</a></li>
               </ul>
             </div>
 
             {/* Support */}
             <div>
-              <h3 className="text-lg font-semibold mb-4 font-manrope">Support</h3>
+              <h3 className="text-lg font-semibold mb-4 font-manrope">Legal & Support</h3>
               <ul className="space-y-3">
-                <li><a href="#privacy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#terms" className="text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
-                <li><a href="#security" className="text-gray-400 hover:text-white transition-colors">Security</a></li>
-                <li><a href="#status" className="text-gray-400 hover:text-white transition-colors">System Status</a></li>
-                <li><a href="#feedback" className="text-gray-400 hover:text-white transition-colors">Feedback</a></li>
+                <li><a href="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</a></li>
+                <li><a href="/terms" className="text-gray-400 hover:text-white transition-colors">Terms of Service</a></li>
+                <li><a href="/contact" className="text-gray-400 hover:text-white transition-colors">Support</a></li>
+                <li><a href="/help" className="text-gray-400 hover:text-white transition-colors">Documentation</a></li>
+                <li><a href="/contact" className="text-gray-400 hover:text-white transition-colors">Feedback</a></li>
               </ul>
             </div>
           </div>
@@ -515,9 +515,9 @@ const LandingPage = () => {
                 © 2024 SocialHub. All rights reserved. Made with ❤️ for meaningful connections.
               </div>
               <div className="flex items-center space-x-6 text-sm">
-                <a href="#privacy" className="text-gray-400 hover:text-white transition-colors">Privacy</a>
-                <a href="#terms" className="text-gray-400 hover:text-white transition-colors">Terms</a>
-                <a href="#cookies" className="text-gray-400 hover:text-white transition-colors">Cookies</a>
+                <a href="/privacy" className="text-gray-400 hover:text-white transition-colors">Privacy</a>
+                <a href="/terms" className="text-gray-400 hover:text-white transition-colors">Terms</a>
+                <a href="/security" className="text-gray-400 hover:text-white transition-colors">Security</a>
               </div>
             </div>
           </div>

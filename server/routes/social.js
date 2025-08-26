@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const { 
   createPost, 
   getPosts, 
@@ -14,6 +15,7 @@ const {
   deleteComment,
   createGroup,
   getUserGroups,
+  getAllGroups,
   getGroup,
   joinGroup,
   leaveGroup,
@@ -35,23 +37,62 @@ const {
   createGroupPost,
   getGroupPost,
   getGroupPosts,
-  deleteGroupPost
+  deleteGroupPost,
+  toggleGroupPostLike,
+  createGroupPostComment,
+  getGroupPostComments,
+  deleteGroupPostComment
 } = require('../database/db');
 
 const router = express.Router();
 
+// Dynamic upload directory resolver
+const getUploadDirectory = (requestUrl) => {
+  // URL pattern to directory mapping - easily extensible
+  const urlToDirectoryMap = {
+    '/groups': 'groups',
+    '/profile/': 'profiles', 
+    '/stories': 'stories',
+    '/messages': 'messages',
+    '/events': 'events',        // Future feature
+    '/marketplace': 'marketplace', // Future feature
+  };
+  
+  // Find matching directory or default to 'posts'
+  for (const [urlPattern, dir] of Object.entries(urlToDirectoryMap)) {
+    if (requestUrl.includes(urlPattern)) {
+      return dir;
+    }
+  }
+  return 'posts'; // default directory
+};
+
+// Ensure directory exists and create if needed
+const ensureDirectoryExists = (dirPath) => {
+  try {
+    if (!fs.existsSync(dirPath)) {
+      fs.mkdirSync(dirPath, { recursive: true });
+      console.log(`📁 Auto-created upload directory: ${dirPath}`);
+    }
+    return true;
+  } catch (error) {
+    console.error(`❌ Failed to create directory ${dirPath}:`, error);
+    return false;
+  }
+};
+
 // Configure multer for file uploads
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    let uploadPath = 'uploads/posts';
-    if (req.originalUrl.includes('/groups')) {
-      uploadPath = 'uploads/groups';
-    } else if (req.originalUrl.includes('/profile/')) {
-      uploadPath = 'uploads/profiles';
-    } else if (req.originalUrl.includes('/stories')) {
-      uploadPath = 'uploads/stories';
+    const uploadSubDir = getUploadDirectory(req.originalUrl);
+    const fullPath = path.join(__dirname, '..', 'uploads', uploadSubDir);
+    
+    // Ensure directory exists
+    if (!ensureDirectoryExists(fullPath)) {
+      return cb(new Error(`Failed to create upload directory: ${fullPath}`));
     }
-    cb(null, path.join(__dirname, '..', uploadPath));
+    
+    cb(null, fullPath);
   },
   filename: (req, file, cb) => {
     const uniqueName = Date.now() + '-' + Math.round(Math.random() * 1E9) + '-' + file.originalname;
@@ -225,6 +266,7 @@ router.post('/posts/:postId/like', (req, res) => {
       return res.status(500).json({ error: 'Failed to toggle like' });
     }
 
+
     // Emit to all connected users
     req.io.emit('post_like_toggle', {
       postId,
@@ -271,6 +313,7 @@ router.post('/posts/:postId/comments', (req, res) => {
       console.error('Error creating comment:', err);
       return res.status(500).json({ error: 'Failed to create comment' });
     }
+
 
     // Emit to all connected users
     req.io.emit('new_comment', {
@@ -348,7 +391,7 @@ router.post('/groups', upload.single('image'), (req, res) => {
 router.get('/groups', (req, res) => {
   const userId = req.user.userId;
 
-  getUserGroups(userId, (err, groups) => {
+  getAllGroups(userId, (err, groups) => {
     if (err) {
       console.error('Error fetching groups:', err);
       return res.status(500).json({ error: 'Failed to fetch groups' });
@@ -384,6 +427,7 @@ router.post('/groups/:groupId/join', (req, res) => {
       console.error('Error joining group:', err);
       return res.status(500).json({ error: 'Failed to join group' });
     }
+
 
     // Emit to group members
     req.io.to(`group_${groupId}`).emit('user_joined_group', {
@@ -780,6 +824,97 @@ router.delete('/groups/:groupId/posts/:postId', (req, res) => {
     req.io.to(`group_${req.params.groupId}`).emit('group_post_deleted', { postId });
 
     res.json({ message: 'Group post deleted successfully' });
+  });
+});
+
+// Toggle like on group post
+router.post('/groups/:groupId/posts/:postId/like', (req, res) => {
+  const postId = parseInt(req.params.postId);
+  const userId = req.user.userId;
+
+  toggleGroupPostLike(postId, userId, (err, result) => {
+    if (err) {
+      console.error('Error toggling group post like:', err);
+      return res.status(500).json({ error: 'Failed to toggle like' });
+    }
+
+    res.json(result);
+  });
+});
+
+// Create comment on group post
+router.post('/groups/:groupId/posts/:postId/comments', (req, res) => {
+  const { content } = req.body;
+  const postId = parseInt(req.params.postId);
+  const groupId = parseInt(req.params.groupId);
+  const userId = req.user.userId;
+
+  if (!content?.trim()) {
+    return res.status(400).json({ error: 'Comment content is required' });
+  }
+
+  createGroupPostComment({
+    post_id: postId,
+    user_id: userId,
+    content: content.trim()
+  }, (err, comment) => {
+    if (err) {
+      console.error('Error creating group post comment:', err);
+      return res.status(500).json({ error: 'Failed to create comment' });
+    }
+
+    // Emit to group members
+    req.io.to(`group_${groupId}`).emit('new_group_post_comment', {
+      ...comment,
+      group_id: groupId,
+      post_id: postId
+    });
+
+    res.status(201).json(comment);
+  });
+});
+
+// Get comments for group post
+router.get('/groups/:groupId/posts/:postId/comments', (req, res) => {
+  const postId = parseInt(req.params.postId);
+
+  getGroupPostComments(postId, (err, comments) => {
+    if (err) {
+      console.error('Error fetching group post comments:', err);
+      return res.status(500).json({ error: 'Failed to fetch comments' });
+    }
+
+    res.json(comments);
+  });
+});
+
+// Delete comment on group post
+router.delete('/groups/:groupId/posts/:postId/comments/:commentId', (req, res) => {
+  const commentId = parseInt(req.params.commentId);
+  const groupId = parseInt(req.params.groupId);
+  const postId = parseInt(req.params.postId);
+  const userId = req.user.userId;
+
+  deleteGroupPostComment(commentId, userId, (err) => {
+    if (err) {
+      console.error('Error deleting group post comment:', err);
+      if (err.message === 'Comment not found') {
+        return res.status(404).json({ error: 'Comment not found' });
+      }
+      if (err.message === 'Permission denied') {
+        return res.status(403).json({ error: 'Permission denied' });
+      }
+      return res.status(500).json({ error: 'Failed to delete comment' });
+    }
+
+    // Emit to group members
+    req.io.to(`group_${groupId}`).emit('group_post_comment_deleted', {
+      commentId,
+      group_id: groupId,
+      post_id: postId
+    });
+
+    res.json({ message: 'Comment deleted successfully' });
   });
 });
 

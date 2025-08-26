@@ -3,9 +3,10 @@ const http = require('http');
 const socketIo = require('socket.io');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
-const { initializeDatabase } = require('./database/db');
+const { initializeDatabase, cleanupExpiredStories } = require('./database/db');
 const authRoutes = require('./routes/auth');
 const socialRoutes = require('./routes/social');
 const { authenticateToken } = require('./middleware/auth');
@@ -23,6 +24,32 @@ const PORT = process.env.PORT || 3001;
 
 app.use(cors());
 app.use(express.json());
+
+// Ensure all upload directories exist
+const ensureUploadDirectories = () => {
+  const uploadDirs = [
+    'uploads',
+    'uploads/posts',
+    'uploads/profiles',
+    'uploads/avatars',
+    'uploads/groups',
+    'uploads/stories',
+    'uploads/messages'
+  ];
+
+  uploadDirs.forEach(dir => {
+    const fullPath = path.join(__dirname, dir);
+    if (!fs.existsSync(fullPath)) {
+      fs.mkdirSync(fullPath, { recursive: true });
+      console.log(`✅ Created upload directory: ${fullPath}`);
+    }
+  });
+
+  console.log('📁 Upload directories verified/created successfully');
+};
+
+// Initialize upload directories
+ensureUploadDirectories();
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
@@ -59,6 +86,7 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   console.log(`User ${socket.username} (ID: ${socket.userId}) connected`);
+  
   
   users.set(socket.userId, {
     socketId: socket.id,
@@ -168,6 +196,26 @@ io.on('connection', (socket) => {
     io.emit('online_users', onlineUsersList);
     console.log('Sent updated online users to all clients:', onlineUsersList.map(u => u.userId));
   });
+});
+
+// Clean up expired stories every hour
+setInterval(() => {
+  cleanupExpiredStories((err) => {
+    if (err) {
+      console.error('❌ Error cleaning up expired stories:', err);
+    } else {
+      console.log('🧹 Cleaned up expired stories');
+    }
+  });
+}, 60 * 60 * 1000); // Run every hour
+
+// Initial cleanup on server start
+cleanupExpiredStories((err) => {
+  if (err) {
+    console.error('❌ Error during initial story cleanup:', err);
+  } else {
+    console.log('🧹 Initial expired stories cleanup completed');
+  }
 });
 
 server.listen(PORT, () => {

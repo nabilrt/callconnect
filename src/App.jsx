@@ -1,9 +1,15 @@
 import React from 'react';
-import { BrowserRouter as Router } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { NotificationProvider } from './context/NotificationContext';
 import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
+import AboutPage from './pages/AboutPage';
+import FeaturesPage from './pages/FeaturesPage';
+import ContactPage from './pages/ContactPage';
+import HelpPage from './pages/HelpPage';
+import PrivacyPage from './pages/PrivacyPage';
+import TermsPage from './pages/TermsPage';
+import SecurityPage from './pages/SecurityPage';
 import Logo from './components/ui/Logo';
 
 const AppContent = () => {
@@ -23,14 +29,23 @@ const AppContent = () => {
     );
   }
 
-  return isAuthenticated ? (
+  return (
     <Router>
-      <NotificationProvider>
+      {isAuthenticated ? (
         <DashboardPage />
-      </NotificationProvider>
+      ) : (
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/features" element={<FeaturesPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/help" element={<HelpPage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/security" element={<SecurityPage />} />
+        </Routes>
+      )}
     </Router>
-  ) : (
-    <LandingPage />
   );
 };
 

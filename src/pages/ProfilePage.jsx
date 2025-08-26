@@ -12,7 +12,7 @@ const ProfilePage = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
-  const { user, token, socket } = useAuth();
+  const { user, token, socket, updateAvatar } = useAuth();
 
   const isOwnProfile = !userId || parseInt(userId) === user?.id;
   const targetUserId = userId || user?.id;
@@ -141,20 +141,11 @@ const ProfilePage = () => {
       return;
     }
 
-    const formData = new FormData();
-    formData.append('avatar', file);
-
     try {
-      const response = await fetch('http://localhost:3001/api/auth/upload-avatar', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (response.ok) {
-        const result = await response.json();
+      const result = await updateAvatar(file);
+      
+      if (result.success) {
+        // Update local profile state
         setProfile(prev => ({ ...prev, avatar: result.avatar }));
         // Show success message briefly
         const successDiv = document.createElement('div');
@@ -163,8 +154,7 @@ const ProfilePage = () => {
         document.body.appendChild(successDiv);
         setTimeout(() => document.body.removeChild(successDiv), 3000);
       } else {
-        const errorData = await response.json();
-        console.error('Failed to update avatar:', errorData);
+        console.error('Failed to update avatar:', result.error);
         alert('Failed to update profile picture. Please try again.');
       }
     } catch (error) {

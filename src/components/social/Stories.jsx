@@ -120,6 +120,30 @@ const Stories = () => {
     setShowViewModal(true);
   };
 
+  const handleStoryViewed = (storyId, userId) => {
+    setStories(prevStories => 
+      prevStories.map(storyGroup => {
+        if (storyGroup.user_id === userId) {
+          const updatedStories = storyGroup.stories.map(story => 
+            story.id === storyId 
+              ? { ...story, viewed_by_current_user: true }
+              : story
+          );
+          
+          // Check if all stories in this group have been viewed
+          const hasUnseenStories = updatedStories.some(story => !story.viewed_by_current_user);
+          
+          return {
+            ...storyGroup,
+            stories: updatedStories,
+            has_unseen: hasUnseenStories
+          };
+        }
+        return storyGroup;
+      })
+    );
+  };
+
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -266,6 +290,7 @@ const Stories = () => {
             setCurrentStoryIndex(0);
           }}
           onStoryChange={setCurrentStoryIndex}
+          onStoryViewed={handleStoryViewed}
           token={token}
         />
       )}
@@ -471,7 +496,7 @@ const CreateStoryModal = ({
 };
 
 // Story View Modal Component
-const StoryViewModal = ({ storyGroup, currentIndex, onClose, onStoryChange, token }) => {
+const StoryViewModal = ({ storyGroup, currentIndex, onClose, onStoryChange, onStoryViewed, token }) => {
   const [progress, setProgress] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const intervalRef = useRef(null);
@@ -486,9 +511,14 @@ const StoryViewModal = ({ storyGroup, currentIndex, onClose, onStoryChange, toke
         headers: {
           'Authorization': `Bearer ${token}`,
         },
+      }).then(response => {
+        if (response.ok) {
+          // Update parent state to mark story as viewed
+          onStoryViewed(currentStory.id, storyGroup.user_id);
+        }
       }).catch(console.error);
     }
-  }, [currentStory, token]);
+  }, [currentStory, token, onStoryViewed, storyGroup.user_id]);
 
   useEffect(() => {
     if (!isPaused) {

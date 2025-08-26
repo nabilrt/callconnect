@@ -547,12 +547,12 @@ const ChatWindow = ({ friend, onClose }) => {
 
         {/* Message Input */}
         <div className="p-3 sm:p-4 border-t border-gray-200 bg-white rounded-b-xl">
-          <div className="flex items-end space-x-2 sm:space-x-3">
+          <div className="flex items-center space-x-2 sm:space-x-3">
             {/* Attachment Button */}
             <div className="relative attachment-menu-container">
               <button
                 onClick={() => setShowAttachmentMenu(!showAttachmentMenu)}
-                className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all duration-200 transform hover:scale-110"
+                className="flex items-center justify-center w-12 h-12 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all duration-200 transform hover:scale-110"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
@@ -612,7 +612,7 @@ const ChatWindow = ({ friend, onClose }) => {
                 placeholder="Type a message..."
                 className="w-full px-4 py-3 border border-gray-300 rounded-2xl resize-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200 placeholder-gray-500 shadow-sm"
                 rows="1"
-                style={{ minHeight: '48px', maxHeight: '120px' }}
+                style={{ height: '48px', maxHeight: '120px' }}
               />
             </div>
             
@@ -620,7 +620,7 @@ const ChatWindow = ({ friend, onClose }) => {
             <button
               onClick={sendMessage}
               disabled={!newMessage.trim()}
-              className={`p-3 rounded-full shadow-lg transform transition-all duration-200 ${
+              className={`flex items-center justify-center w-12 h-12 rounded-full shadow-lg transform transition-all duration-200 ${
                 newMessage.trim() 
                   ? 'bg-indigo-600 hover:bg-indigo-700 hover:scale-105 text-white' 
                   : 'bg-gray-100 text-gray-400 cursor-not-allowed'

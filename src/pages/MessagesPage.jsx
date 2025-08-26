@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNotifications } from '../context/NotificationContext';
 import Avatar from '../components/ui/Avatar';
 import ChatWindow from '../components/chat/ChatWindow';
 
@@ -12,7 +11,6 @@ const MessagesPage = () => {
   const [conversationPreviews, setConversationPreviews] = useState(new Map());
   
   const { token, socket, onlineUsers } = useAuth();
-  const { unreadMessagesByFriend, markMessagesAsRead } = useNotifications();
 
   const fetchMessagePreviews = useCallback(async (friendsList) => {
     if (!token) return;
@@ -112,8 +110,6 @@ const MessagesPage = () => {
   const handleChatOpen = (friend) => {
     setSelectedFriend(friend);
     setShowChat(true);
-    // Mark messages as read when opening chat
-    markMessagesAsRead(friend.id);
   };
 
   const formatMessagePreview = (message, messageType, isFromMe) => {
@@ -215,9 +211,7 @@ const MessagesPage = () => {
               <div 
                 key={friend.id}
                 onClick={() => handleChatOpen(friend)}
-                className={`flex items-center space-x-4 p-6 hover:bg-gray-50 cursor-pointer transition-colors duration-200 ${
-                  unreadMessagesByFriend.has(friend.id) ? 'bg-blue-50' : ''
-                }`}
+                className="flex items-center space-x-4 p-6 hover:bg-gray-50 cursor-pointer transition-colors duration-200"
               >
                 <div className="relative">
                   <Avatar 
@@ -251,11 +245,6 @@ const MessagesPage = () => {
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {unreadMessagesByFriend.has(friend.id) && (
-                    <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
-                      {unreadMessagesByFriend.get(friend.id)}
-                    </span>
-                  )}
                   <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
