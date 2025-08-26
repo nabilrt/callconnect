@@ -172,6 +172,56 @@ const initializeDatabase = () => {
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`);
 
+    // Stories table
+    db.run(`CREATE TABLE IF NOT EXISTS stories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      content TEXT DEFAULT NULL,
+      image TEXT DEFAULT NULL,
+      video TEXT DEFAULT NULL,
+      story_type TEXT DEFAULT 'image' CHECK(story_type IN ('text', 'image', 'video')),
+      background_color TEXT DEFAULT NULL,
+      text_color TEXT DEFAULT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
+    // Story views table
+    db.run(`CREATE TABLE IF NOT EXISTS story_views (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      story_id INTEGER NOT NULL,
+      viewer_id INTEGER NOT NULL,
+      viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE,
+      FOREIGN KEY (viewer_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(story_id, viewer_id)
+    )`);
+
+    // Group post likes table
+    db.run(`CREATE TABLE IF NOT EXISTS group_post_likes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      post_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (post_id) REFERENCES group_posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      UNIQUE(post_id, user_id)
+    )`);
+
+    // Group post comments table
+    db.run(`CREATE TABLE IF NOT EXISTS group_post_comments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      post_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      comment TEXT NOT NULL,
+      likes_count INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (post_id) REFERENCES group_posts(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`);
+
     // Update users table to include social media profile fields
     // Check and add columns only if they don't exist
     db.get("PRAGMA table_info(users)", (err, result) => {
@@ -728,6 +778,242 @@ const updateUserCoverPhoto = (userId, coverPhotoPath, callback) => {
   db.run(query, [coverPhotoPath, now, userId], callback);
 };
 
+// ==================== STORIES FUNCTIONS ====================
+
+const createStory = (storyData, callback) => {
+  const { user_id, content, image, video, story_type, background_color, text_color } = storyData;
+  
+  // Stories expire after 24 hours
+  const now = new Date();
+  const expiresAt = new Date();
+  expiresAt.setHours(expiresAt.getHours() + 24);
+  
+  const query = `
+    INSERT INTO stories (user_id, content, image, video, story_type, background_color, text_color, created_at, expires_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  
+  db.run(query, [user_id, content, image, video, story_type, background_color, text_color, now.toISOString(), expiresAt.toISOString()], function(err) {
+    if (err) {
+      callback(err);
+      return;
+    }
+    
+    // Get the created story with user info
+    getStory(this.lastID, user_id, callback);
+  });
+};
+
+const getStory = (storyId, viewerId, callback) => {
+  const query = `
+    SELECT s.*, 
+           u.username, 
+           u.avatar,
+           (SELECT COUNT(*) FROM story_views WHERE story_id = s.id) as view_count,
+           (SELECT COUNT(*) FROM story_views WHERE story_id = s.id AND viewer_id = ?) as user_viewed
+    FROM stories s
+    JOIN users u ON s.user_id = u.id
+    WHERE s.id = ? AND s.expires_at > datetime('now')
+  `;
+  
+  db.get(query, [viewerId, storyId], callback);
+};
+
+const getFriendsStories = (userId, callback) => {
+  const query = `
+    SELECT s.*, 
+           u.username, 
+           u.avatar,
+           (SELECT COUNT(*) FROM story_views WHERE story_id = s.id) as view_count,
+           (SELECT COUNT(*) FROM story_views WHERE story_id = s.id AND viewer_id = ?) as user_viewed
+    FROM stories s
+    JOIN users u ON s.user_id = u.id
+    WHERE s.expires_at > datetime('now') AND (
+      s.user_id = ? OR
+      s.user_id IN (
+        SELECT CASE 
+          WHEN f.user1_id = ? THEN f.user2_id
+          ELSE f.user1_id
+        END
+        FROM friendships f 
+        WHERE f.user1_id = ? OR f.user2_id = ?
+      )
+    )
+    ORDER BY CASE WHEN s.user_id = ? THEN 0 ELSE 1 END, s.created_at DESC
+  `;
+  
+  db.all(query, [userId, userId, userId, userId, userId, userId], (err, stories) => {
+    if (err) {
+      callback(err);
+      return;
+    }
+    
+    // Group stories by user
+    const groupedStories = {};
+    stories.forEach(story => {
+      if (!groupedStories[story.user_id]) {
+        groupedStories[story.user_id] = {
+          user_id: story.user_id,
+          username: story.username,
+          avatar: story.avatar,
+          stories: [],
+          has_unseen: false
+        };
+      }
+      
+      groupedStories[story.user_id].stories.push(story);
+      // For own stories, always show as "viewed", for others check if user has viewed
+      if (story.user_id !== userId && story.user_viewed === 0) {
+        groupedStories[story.user_id].has_unseen = true;
+      }
+    });
+    
+    // Sort stories within each group by created_at DESC to ensure latest first
+    Object.values(groupedStories).forEach(group => {
+      group.stories.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    });
+    
+    callback(null, Object.values(groupedStories));
+  });
+};
+
+const getUserStories = (userId, viewerId, callback) => {
+  const query = `
+    SELECT s.*, 
+           u.username, 
+           u.avatar,
+           (SELECT COUNT(*) FROM story_views WHERE story_id = s.id) as view_count,
+           (SELECT COUNT(*) FROM story_views WHERE story_id = s.id AND viewer_id = ?) as user_viewed
+    FROM stories s
+    JOIN users u ON s.user_id = u.id
+    WHERE s.user_id = ? AND s.expires_at > datetime('now')
+    ORDER BY s.created_at ASC
+  `;
+  
+  db.all(query, [viewerId, userId], callback);
+};
+
+const viewStory = (storyId, viewerId, callback) => {
+  // Insert or ignore (in case already viewed)
+  const query = `
+    INSERT OR IGNORE INTO story_views (story_id, viewer_id)
+    VALUES (?, ?)
+  `;
+  
+  db.run(query, [storyId, viewerId], callback);
+};
+
+const deleteStory = (storyId, userId, callback) => {
+  const query = `DELETE FROM stories WHERE id = ? AND user_id = ?`;
+  db.run(query, [storyId, userId], callback);
+};
+
+const getStoryViews = (storyId, ownerId, callback) => {
+  // Only allow story owner to see views
+  const query = `
+    SELECT sv.viewed_at, u.username, u.avatar
+    FROM story_views sv
+    JOIN users u ON sv.viewer_id = u.id
+    JOIN stories s ON sv.story_id = s.id
+    WHERE sv.story_id = ? AND s.user_id = ?
+    ORDER BY sv.viewed_at DESC
+  `;
+  
+  db.all(query, [storyId, ownerId], callback);
+};
+
+// Clean up expired stories (call this periodically)
+const cleanupExpiredStories = (callback) => {
+  const query = `DELETE FROM stories WHERE expires_at <= datetime('now')`;
+  db.run(query, callback);
+};
+
+// ==================== GROUP POSTS FUNCTIONS ====================
+
+const createGroupPost = (postData, callback) => {
+  const { group_id, user_id, content, image, video, post_type } = postData;
+  const now = new Date().toISOString();
+  
+  const query = `
+    INSERT INTO group_posts (group_id, user_id, content, image, video, post_type, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  
+  db.run(query, [group_id, user_id, content, image, video, post_type, now, now], function(err) {
+    if (err) {
+      callback(err);
+      return;
+    }
+    
+    // Get the created post with user info
+    getGroupPost(this.lastID, user_id, callback);
+  });
+};
+
+const getGroupPost = (postId, viewerId, callback) => {
+  const query = `
+    SELECT gp.*, 
+           u.username, 
+           u.avatar,
+           (SELECT COUNT(*) FROM group_post_likes WHERE post_id = gp.id) as likes_count,
+           (SELECT COUNT(*) FROM group_post_likes WHERE post_id = gp.id AND user_id = ?) as user_liked,
+           (SELECT COUNT(*) FROM group_post_comments WHERE post_id = gp.id) as comments_count
+    FROM group_posts gp
+    JOIN users u ON gp.user_id = u.id
+    WHERE gp.id = ?
+  `;
+  
+  db.get(query, [viewerId, postId], callback);
+};
+
+const getGroupPosts = (groupId, userId, callback) => {
+  const query = `
+    SELECT gp.*, 
+           u.username, 
+           u.avatar,
+           (SELECT COUNT(*) FROM group_post_likes WHERE post_id = gp.id) as likes_count,
+           (SELECT COUNT(*) FROM group_post_likes WHERE post_id = gp.id AND user_id = ?) as user_liked,
+           (SELECT COUNT(*) FROM group_post_comments WHERE post_id = gp.id) as comments_count
+    FROM group_posts gp
+    JOIN users u ON gp.user_id = u.id
+    WHERE gp.group_id = ?
+    ORDER BY gp.created_at DESC
+    LIMIT 50
+  `;
+  
+  db.all(query, [userId, groupId], callback);
+};
+
+const deleteGroupPost = (postId, userId, callback) => {
+  // First check if user owns the post or is group admin
+  const checkQuery = `
+    SELECT gp.user_id, gm.role
+    FROM group_posts gp
+    JOIN group_members gm ON gp.group_id = gm.group_id AND gm.user_id = ?
+    WHERE gp.id = ?
+  `;
+  
+  db.get(checkQuery, [userId, postId], (err, result) => {
+    if (err) {
+      callback(err);
+      return;
+    }
+    
+    if (!result) {
+      callback(new Error('Post not found or access denied'));
+      return;
+    }
+    
+    // Allow deletion if user owns the post or is admin/moderator
+    if (result.user_id === userId || result.role === 'admin' || result.role === 'moderator') {
+      const deleteQuery = `DELETE FROM group_posts WHERE id = ?`;
+      db.run(deleteQuery, [postId], callback);
+    } else {
+      callback(new Error('Permission denied'));
+    }
+  });
+};
+
 
 module.exports = {
   db,
@@ -772,5 +1058,21 @@ module.exports = {
   sendGroupMessage,
   getGroupMessages,
   updateUserProfile,
-  updateUserCoverPhoto
+  updateUserCoverPhoto,
+  
+  // Stories Functions
+  createStory,
+  getStory,
+  getFriendsStories,
+  getUserStories,
+  viewStory,
+  deleteStory,
+  getStoryViews,
+  cleanupExpiredStories,
+  
+  // Group Posts Functions
+  createGroupPost,
+  getGroupPost,
+  getGroupPosts,
+  deleteGroupPost
 };

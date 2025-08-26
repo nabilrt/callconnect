@@ -101,25 +101,38 @@ const Navigation = () => {
           </div>
 
           {/* Center Section - Main Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            {navItems.map((item) => (
+          <div className="hidden md:flex items-center space-x-2">
+            {navItems.map((item, index) => (
               <NavLink
                 key={item.path}
                 to={item.path}
                 className={({ isActive }) =>
-                  `relative p-3 rounded-lg transition-all duration-200 group ${
+                  `relative p-4 mx-2 rounded-xl transition-all duration-300 ease-in-out group transform hover:scale-105 ${
                     isActive
-                      ? 'text-indigo-600 bg-indigo-50'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      ? 'text-indigo-600 bg-indigo-50 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
                   }`
                 }
                 title={item.name}
+                style={{
+                  transitionDelay: `${index * 50}ms`
+                }}
               >
-                {item.icon}
+                <div className="transition-transform duration-300 ease-in-out group-hover:scale-110">
+                  {item.icon}
+                </div>
                 {/* Active indicator */}
-                <div className={`absolute bottom-0 left-1/2 transform -translate-x-1/2 h-1 bg-indigo-600 rounded-t-lg transition-all duration-200 ${
-                  item.path === location.pathname ? 'w-full' : 'w-0'
-                }`} />
+                <div 
+                  className={`absolute bottom-1 left-1/2 transform -translate-x-1/2 h-1 bg-indigo-600 rounded-full transition-all duration-500 ease-out ${
+                    item.path === location.pathname ? 'w-8 opacity-100' : 'w-0 opacity-0'
+                  }`} 
+                />
+                {/* Hover indicator */}
+                <div 
+                  className={`absolute bottom-1 left-1/2 transform -translate-x-1/2 h-1 bg-gray-400 rounded-full transition-all duration-300 ease-out ${
+                    item.path !== location.pathname ? 'group-hover:w-6 group-hover:opacity-60' : 'w-0 opacity-0'
+                  }`} 
+                />
               </NavLink>
             ))}
           </div>
@@ -127,25 +140,28 @@ const Navigation = () => {
           {/* Right Section - Actions and Profile */}
           <div className="flex items-center space-x-4">
             {/* Action Items */}
-            <div className="flex items-center space-x-2">
-              {actionItems.map((item) => (
+            <div className="flex items-center space-x-3">
+              {actionItems.map((item, index) => (
                 <NavLink
                   key={item.path}
                   to={item.path}
                   className={({ isActive }) =>
-                    `relative p-2 rounded-full transition-all duration-200 ${
+                    `relative p-3 rounded-full transition-all duration-300 ease-in-out group transform hover:scale-110 ${
                       isActive
-                        ? 'text-indigo-600 bg-indigo-50'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                        ? 'text-indigo-600 bg-indigo-50 shadow-md'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 hover:shadow-sm'
                     }`
                   }
                   title={item.name}
+                  style={{
+                    transitionDelay: `${index * 30}ms`
+                  }}
                 >
-                  <div className="relative">
+                  <div className="relative transition-transform duration-300 ease-in-out group-hover:scale-105">
                     {item.icon}
                     {item.notificationCount > 0 && (
-                      <div className="absolute -top-1 -right-1 min-w-[18px] h-4 bg-red-500 rounded-full flex items-center justify-center">
-                        <span className="text-xs text-white font-medium px-1">
+                      <div className="absolute -top-2 -right-2 min-w-[20px] h-5 bg-red-500 rounded-full flex items-center justify-center transform transition-all duration-300 ease-out group-hover:scale-110 animate-pulse">
+                        <span className="text-xs text-white font-bold px-1">
                           {item.notificationCount > 99 ? '99+' : item.notificationCount}
                         </span>
                       </div>
@@ -159,19 +175,21 @@ const Navigation = () => {
             <div className="relative" ref={dropdownRef}>
               <button
                 onClick={() => setShowDropdown(!showDropdown)}
-                className="flex items-center space-x-2 p-1 rounded-full hover:bg-gray-100 transition-all duration-200"
+                className="flex items-center space-x-2 p-2 rounded-full hover:bg-gray-100 transition-all duration-300 ease-in-out transform hover:scale-105"
               >
-                <Avatar 
-                  src={user?.avatar} 
-                  alt={user?.username || 'Profile'} 
-                  size="sm"
-                />
-                <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[120px] truncate">
+                <div className="transition-transform duration-300 ease-in-out hover:scale-110">
+                  <Avatar 
+                    src={user?.avatar} 
+                    alt={user?.username || 'Profile'} 
+                    size="sm"
+                  />
+                </div>
+                <span className="hidden sm:block text-sm font-medium text-gray-700 max-w-[120px] truncate transition-colors duration-200">
                   {user?.username || 'User'}
                 </span>
                 <svg 
-                  className={`w-4 h-4 text-gray-500 transition-transform duration-200 ${
-                    showDropdown ? 'rotate-180' : ''
+                  className={`w-4 h-4 text-gray-500 transition-all duration-300 ease-in-out ${
+                    showDropdown ? 'rotate-180 text-indigo-600' : 'rotate-0'
                   }`} 
                   fill="none" 
                   stroke="currentColor" 
@@ -183,20 +201,20 @@ const Navigation = () => {
 
               {/* Dropdown Menu */}
               {showDropdown && (
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50">
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-200 py-2 z-50 transform transition-all duration-300 ease-out animate-in slide-in-from-top-2">
                   {/* User Info */}
                   <div className="px-4 py-3 border-b border-gray-100">
-                    <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-3 transition-all duration-200 hover:bg-gray-50 rounded-lg p-2 -m-2">
                       <Avatar 
                         src={user?.avatar} 
                         alt={user?.username || 'Profile'} 
                         size="md"
                       />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">
+                        <p className="text-sm font-medium text-gray-900 transition-colors duration-200">
                           {user?.username || 'User'}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-gray-500 transition-colors duration-200">
                           {user?.email || ''}
                         </p>
                       </div>
@@ -206,9 +224,9 @@ const Navigation = () => {
                   {/* Menu Items */}
                   <button
                     onClick={handleProfileClick}
-                    className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors duration-150"
+                    className="flex items-center space-x-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 transition-all duration-200 ease-in-out hover:translate-x-1"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                     <span>Your Profile</span>
@@ -218,9 +236,9 @@ const Navigation = () => {
                   
                   <button
                     onClick={handleLogout}
-                    className="flex items-center space-x-3 w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-150"
+                    className="flex items-center space-x-3 w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 transition-all duration-200 ease-in-out hover:translate-x-1"
                   >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 transition-transform duration-200 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                     </svg>
                     <span>Log Out</span>

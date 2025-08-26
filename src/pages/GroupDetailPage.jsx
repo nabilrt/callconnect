@@ -3,12 +3,16 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/ui/Avatar';
 import GroupChatWindow from '../components/social/GroupChatWindow';
+import GroupCreatePost from '../components/social/GroupCreatePost';
+import GroupPostCard from '../components/social/GroupPostCard';
 
 const GroupDetailPage = () => {
   const { groupId } = useParams();
   const [group, setGroup] = useState(null);
   const [members, setMembers] = useState([]);
+  const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [postsLoading, setPostsLoading] = useState(true);
   const [showChat, setShowChat] = useState(false);
   const { token, socket } = useAuth();
 
@@ -16,6 +20,7 @@ const GroupDetailPage = () => {
     if (groupId) {
       fetchGroup();
       fetchMembers();
+      fetchPosts();
     }
   }, [groupId, token]);
 
@@ -26,11 +31,15 @@ const GroupDetailPage = () => {
 
       socket.on('user_joined_group', handleUserJoined);
       socket.on('user_left_group', handleUserLeft);
+      socket.on('new_group_post', handleNewGroupPost);
+      socket.on('group_post_deleted', handleGroupPostDeleted);
 
       return () => {
         socket.emit('leave_group', parseInt(groupId));
         socket.off('user_joined_group');
         socket.off('user_left_group');
+        socket.off('new_group_post');
+        socket.off('group_post_deleted');
       };
     }
   }, [socket, groupId]);
@@ -121,6 +130,43 @@ const GroupDetailPage = () => {
     } catch (error) {
       console.error('Error leaving group:', error);
     }
+  };
+
+  const fetchPosts = async () => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/social/groups/${groupId}/posts`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const postsData = await response.json();
+        setPosts(postsData);
+      }
+    } catch (error) {
+      console.error('Error fetching group posts:', error);
+    } finally {
+      setPostsLoading(false);
+    }
+  };
+
+  const handleNewGroupPost = (newPost) => {
+    if (parseInt(newPost.group_id) === parseInt(groupId)) {
+      setPosts(prev => [newPost, ...prev]);
+    }
+  };
+
+  const handleGroupPostDeleted = ({ postId }) => {
+    setPosts(prev => prev.filter(post => post.id !== postId));
+  };
+
+  const handlePostCreated = (newPost) => {
+    setPosts(prev => [newPost, ...prev]);
+  };
+
+  const handlePostDeleted = (postId) => {
+    setPosts(prev => prev.filter(post => post.id !== postId));
   };
 
   if (loading) {
@@ -235,6 +281,54 @@ const GroupDetailPage = () => {
             </div>
           </div>
         </div>
+
+        {/* Posts Section */}
+        {group.user_role && (
+          <div className="mt-6 px-4">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">Posts</h2>
+            
+            {/* Create Post - Only for members */}
+            <GroupCreatePost group={group} onPostCreated={handlePostCreated} />
+            
+            {/* Posts List */}
+            {postsLoading ? (
+              <div className="space-y-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 animate-pulse">
+                    <div className="flex items-center space-x-3 mb-3">
+                      <div className="w-10 h-10 bg-gray-200 rounded-full"></div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-200 rounded w-1/4 mb-2"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/6"></div>
+                      </div>
+                    </div>
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                  </div>
+                ))}
+              </div>
+            ) : posts.length > 0 ? (
+              <div>
+                {posts.map((post) => (
+                  <GroupPostCard 
+                    key={post.id} 
+                    post={post}
+                    group={group}
+                    onDelete={handlePostDeleted}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+                <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 7a2 2 0 012-2h10a2 2 0 012 2v2M5 11V9a2 2 0 012-2h10a2 2 0 012 2v2" />
+                </svg>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No posts yet</h3>
+                <p className="text-gray-500 mb-6">Be the first to share something in this group!</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Members Section */}
         <div className="mt-6 px-4 pb-8">

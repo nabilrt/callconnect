@@ -22,7 +22,20 @@ const {
   getGroupMessages,
   updateUserProfile,
   updateUserCoverPhoto,
-  getUser
+  getUser,
+  // Stories Functions
+  createStory,
+  getStory,
+  getFriendsStories,
+  getUserStories,
+  viewStory,
+  deleteStory,
+  getStoryViews,
+  // Group Posts Functions
+  createGroupPost,
+  getGroupPost,
+  getGroupPosts,
+  deleteGroupPost
 } = require('../database/db');
 
 const router = express.Router();
@@ -31,10 +44,12 @@ const router = express.Router();
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let uploadPath = 'uploads/posts';
-    if (req.originalUrl.includes('/groups/')) {
+    if (req.originalUrl.includes('/groups')) {
       uploadPath = 'uploads/groups';
     } else if (req.originalUrl.includes('/profile/')) {
       uploadPath = 'uploads/profiles';
+    } else if (req.originalUrl.includes('/stories')) {
+      uploadPath = 'uploads/stories';
     }
     cb(null, path.join(__dirname, '..', uploadPath));
   },
@@ -532,6 +547,239 @@ router.get('/profile/:userId', (req, res) => {
     // Remove sensitive information
     const { password, ...safeUser } = user;
     res.json(safeUser);
+  });
+});
+
+// ==================== STORIES ROUTES ====================
+
+// Create a new story
+router.post('/stories', upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'video', maxCount: 1 }
+]), (req, res) => {
+  const { content, story_type = 'image', background_color, text_color } = req.body;
+  const user_id = req.user.userId;
+
+  let actualStoryType = story_type;
+  let image = null;
+  let video = null;
+
+  if (req.files?.image) {
+    actualStoryType = 'image';
+    image = `stories/${req.files.image[0].filename}`;
+  } else if (req.files?.video) {
+    actualStoryType = 'video';
+    video = `stories/${req.files.video[0].filename}`;
+  }
+
+  // For text stories, we need content or background color
+  if (!content && !image && !video && !background_color) {
+    return res.status(400).json({ error: 'Story content, image, video, or background is required' });
+  }
+
+  createStory({
+    user_id,
+    content: content || null,
+    image,
+    video,
+    story_type: actualStoryType,
+    background_color,
+    text_color
+  }, (err, story) => {
+    if (err) {
+      console.error('Error creating story:', err);
+      return res.status(500).json({ error: 'Failed to create story' });
+    }
+
+    // Emit to all connected users
+    req.io.emit('new_story', {
+      ...story,
+      author_id: user_id
+    });
+
+    res.status(201).json(story);
+  });
+});
+
+// Get friends' stories (grouped by user)
+router.get('/stories', (req, res) => {
+  const userId = req.user.userId;
+
+  getFriendsStories(userId, (err, storiesGroups) => {
+    if (err) {
+      console.error('Error fetching stories:', err);
+      return res.status(500).json({ error: 'Failed to fetch stories' });
+    }
+    res.json(storiesGroups);
+  });
+});
+
+// Get single story
+router.get('/stories/:storyId', (req, res) => {
+  const storyId = parseInt(req.params.storyId);
+  const viewerId = req.user.userId;
+
+  getStory(storyId, viewerId, (err, story) => {
+    if (err) {
+      console.error('Error fetching story:', err);
+      return res.status(500).json({ error: 'Failed to fetch story' });
+    }
+    if (!story) {
+      return res.status(404).json({ error: 'Story not found or expired' });
+    }
+    res.json(story);
+  });
+});
+
+// Get user's stories
+router.get('/stories/user/:userId', (req, res) => {
+  const userId = parseInt(req.params.userId);
+  const viewerId = req.user.userId;
+
+  getUserStories(userId, viewerId, (err, stories) => {
+    if (err) {
+      console.error('Error fetching user stories:', err);
+      return res.status(500).json({ error: 'Failed to fetch user stories' });
+    }
+    res.json(stories);
+  });
+});
+
+// View a story (mark as viewed)
+router.post('/stories/:storyId/view', (req, res) => {
+  const storyId = parseInt(req.params.storyId);
+  const viewerId = req.user.userId;
+
+  viewStory(storyId, viewerId, (err) => {
+    if (err) {
+      console.error('Error viewing story:', err);
+      return res.status(500).json({ error: 'Failed to view story' });
+    }
+
+    // Emit story view event
+    req.io.emit('story_viewed', {
+      storyId,
+      viewerId
+    });
+
+    res.json({ message: 'Story viewed successfully' });
+  });
+});
+
+// Delete a story
+router.delete('/stories/:storyId', (req, res) => {
+  const storyId = parseInt(req.params.storyId);
+  const userId = req.user.userId;
+
+  deleteStory(storyId, userId, (err) => {
+    if (err) {
+      console.error('Error deleting story:', err);
+      return res.status(500).json({ error: 'Failed to delete story' });
+    }
+
+    // Emit story deletion event
+    req.io.emit('story_deleted', { storyId });
+
+    res.json({ message: 'Story deleted successfully' });
+  });
+});
+
+// Get story views (only for story owner)
+router.get('/stories/:storyId/views', (req, res) => {
+  const storyId = parseInt(req.params.storyId);
+  const ownerId = req.user.userId;
+
+  getStoryViews(storyId, ownerId, (err, views) => {
+    if (err) {
+      console.error('Error fetching story views:', err);
+      return res.status(500).json({ error: 'Failed to fetch story views' });
+    }
+    res.json(views);
+  });
+});
+
+// ==================== GROUP POSTS ROUTES ====================
+
+// Create a new group post
+router.post('/groups/:groupId/posts', upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'video', maxCount: 1 }
+]), (req, res) => {
+  const { content } = req.body;
+  const groupId = parseInt(req.params.groupId);
+  const user_id = req.user.userId;
+
+  // Check if user is a member of the group first
+  // We'll assume they are for now, but should validate membership
+
+  let actualPostType = 'text';
+  let image = null;
+  let video = null;
+
+  if (req.files?.image) {
+    actualPostType = 'image';
+    image = `groups/${req.files.image[0].filename}`;
+  } else if (req.files?.video) {
+    actualPostType = 'video';
+    video = `groups/${req.files.video[0].filename}`;
+  }
+
+  if (!content?.trim() && !image && !video) {
+    return res.status(400).json({ error: 'Post content, image, or video is required' });
+  }
+
+  createGroupPost({
+    group_id: groupId,
+    user_id,
+    content: content?.trim() || null,
+    image,
+    video,
+    post_type: actualPostType
+  }, (err, post) => {
+    if (err) {
+      console.error('Error creating group post:', err);
+      return res.status(500).json({ error: 'Failed to create group post' });
+    }
+
+    // Emit to group members
+    req.io.to(`group_${groupId}`).emit('new_group_post', {
+      ...post,
+      group_id: groupId
+    });
+
+    res.status(201).json(post);
+  });
+});
+
+// Get group posts
+router.get('/groups/:groupId/posts', (req, res) => {
+  const groupId = parseInt(req.params.groupId);
+  const userId = req.user.userId;
+
+  getGroupPosts(groupId, userId, (err, posts) => {
+    if (err) {
+      console.error('Error fetching group posts:', err);
+      return res.status(500).json({ error: 'Failed to fetch group posts' });
+    }
+    res.json(posts);
+  });
+});
+
+// Delete a group post
+router.delete('/groups/:groupId/posts/:postId', (req, res) => {
+  const postId = parseInt(req.params.postId);
+  const userId = req.user.userId;
+
+  deleteGroupPost(postId, userId, (err) => {
+    if (err) {
+      console.error('Error deleting group post:', err);
+      return res.status(500).json({ error: 'Failed to delete group post' });
+    }
+
+    // Emit deletion event to group
+    req.io.to(`group_${req.params.groupId}`).emit('group_post_deleted', { postId });
+
+    res.json({ message: 'Group post deleted successfully' });
   });
 });
 

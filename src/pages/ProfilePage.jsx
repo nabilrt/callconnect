@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/ui/Avatar';
 import PostCard from '../components/social/PostCard';
+import CreatePost from '../components/social/CreatePost';
 import EditProfileModal from '../components/social/EditProfileModal';
 
 const ProfilePage = () => {
@@ -27,11 +28,13 @@ const ProfilePage = () => {
   useEffect(() => {
     if (!socket) return;
 
+    socket.on('new_post', handleNewPost);
     socket.on('post_deleted', handlePostDeleted);
     socket.on('post_like_toggle', handlePostLikeToggle);
     socket.on('new_comment', handleNewComment);
 
     return () => {
+      socket.off('new_post');
       socket.off('post_deleted');
       socket.off('post_like_toggle');
       socket.off('new_comment');
@@ -202,6 +205,13 @@ const ProfilePage = () => {
     setPosts(prev => prev.filter(post => post.id !== postId));
   };
 
+  const handleNewPost = (newPost) => {
+    // Only add the post if it's from the profile being viewed
+    if (newPost.author_id === parseInt(targetUserId)) {
+      setPosts(prev => [newPost, ...prev]);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -365,6 +375,13 @@ const ProfilePage = () => {
             {isOwnProfile ? 'Your Posts' : `${profile.username}'s Posts`}
           </h2>
           
+          {/* Create Post - Only show on own profile */}
+          {isOwnProfile && (
+            <div className="mb-6">
+              <CreatePost onPostCreated={handleNewPost} />
+            </div>
+          )}
+          
           {posts.length > 0 ? (
             <div className="space-y-6">
               {posts.map((post) => (
@@ -383,12 +400,20 @@ const ProfilePage = () => {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 7a2 2 0 012-2h10a2 2 0 012 2v2M5 11V9a2 2 0 012-2h10a2 2 0 012 2v2" />
               </svg>
               <h3 className="text-lg font-medium text-gray-900 mb-2">No posts yet</h3>
-              <p className="text-gray-500">
+              <p className="text-gray-500 mb-4">
                 {isOwnProfile ? 
                   "You haven't shared any posts yet. Create your first post to share your thoughts!" :
                   `${profile.username} hasn't shared any posts yet.`
                 }
               </p>
+              {isOwnProfile && (
+                <button 
+                  onClick={() => document.getElementById('post-textarea')?.focus()}
+                  className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors font-medium"
+                >
+                  Create Your First Post
+                </button>
+              )}
             </div>
           )}
         </div>
