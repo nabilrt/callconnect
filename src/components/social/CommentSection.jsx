@@ -42,9 +42,7 @@ const CommentSection = ({ postId, comments, setComments, onComment }) => {
         setComments(prev => [...prev, newCommentData]);
         setNewComment('');
         
-        if (onComment) {
-          onComment({ postId });
-        }
+        // Don't call onComment here - let the socket event handle comment count increment
       } else {
         console.error('Failed to add comment');
       }

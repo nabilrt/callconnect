@@ -71,13 +71,15 @@ const initializeDatabase = () => {
       content TEXT NOT NULL,
       image TEXT DEFAULT NULL,
       video TEXT DEFAULT NULL,
-      post_type TEXT DEFAULT 'text' CHECK(post_type IN ('text', 'image', 'video')),
+      post_type TEXT DEFAULT 'text' CHECK(post_type IN ('text', 'image', 'video', 'shared')),
+      shared_post_id INTEGER DEFAULT NULL,
       privacy TEXT DEFAULT 'friends' CHECK(privacy IN ('public', 'friends', 'private')),
       likes_count INTEGER DEFAULT 0,
       comments_count INTEGER DEFAULT 0,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+      FOREIGN KEY (shared_post_id) REFERENCES posts(id) ON DELETE CASCADE
     )`);
 
     // Post likes table
@@ -398,11 +400,11 @@ const markAllNotificationsAsRead = (userId, callback) => {
 
 // POST FUNCTIONS
 const createPost = (postData, callback) => {
-  const { user_id, content, image, video, post_type, privacy } = postData;
+  const { user_id, content, image, video, post_type, privacy, shared_post_id } = postData;
   const now = new Date().toISOString();
-  const query = `INSERT INTO posts (user_id, content, image, video, post_type, privacy, created_at, updated_at) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
-  db.run(query, [user_id, content, image, video, post_type, privacy, now, now], function(err) {
+  const query = `INSERT INTO posts (user_id, content, image, video, post_type, privacy, shared_post_id, created_at, updated_at) 
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  db.run(query, [user_id, content, image, video, post_type, privacy, shared_post_id, now, now], function(err) {
     if (callback) {
       callback(err, { 
         id: this.lastID, 
@@ -423,9 +425,14 @@ const createPost = (postData, callback) => {
 const getPosts = (userId, limit = 20, callback) => {
   const query = `
     SELECT p.*, u.username, u.avatar, u.id as author_id,
-           (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked
+           (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked,
+           sp.id as shared_id, sp.content as shared_content, sp.image as shared_image, 
+           sp.video as shared_video, sp.post_type as shared_post_type,
+           su.username as shared_username, su.avatar as shared_avatar
     FROM posts p
     JOIN users u ON p.user_id = u.id
+    LEFT JOIN posts sp ON p.shared_post_id = sp.id
+    LEFT JOIN users su ON sp.user_id = su.id
     LEFT JOIN friendships f ON (
       (f.user1_id = ? AND f.user2_id = p.user_id) OR 
       (f.user2_id = ? AND f.user1_id = p.user_id)
@@ -440,9 +447,14 @@ const getPosts = (userId, limit = 20, callback) => {
 const getUserPosts = (userId, viewerId, callback) => {
   const query = `
     SELECT p.*, u.username, u.avatar, u.id as author_id,
-           (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked
+           (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked,
+           sp.id as shared_id, sp.content as shared_content, sp.image as shared_image, 
+           sp.video as shared_video, sp.post_type as shared_post_type,
+           su.username as shared_username, su.avatar as shared_avatar
     FROM posts p
     JOIN users u ON p.user_id = u.id
+    LEFT JOIN posts sp ON p.shared_post_id = sp.id
+    LEFT JOIN users su ON sp.user_id = su.id
     WHERE p.user_id = ? AND (p.privacy != 'private' OR p.user_id = ?)
     ORDER BY p.created_at DESC
   `;
@@ -452,9 +464,14 @@ const getUserPosts = (userId, viewerId, callback) => {
 const getPost = (postId, userId, callback) => {
   const query = `
     SELECT p.*, u.username, u.avatar, u.id as author_id,
-           (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked
+           (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked,
+           sp.id as shared_id, sp.content as shared_content, sp.image as shared_image, 
+           sp.video as shared_video, sp.post_type as shared_post_type,
+           su.username as shared_username, su.avatar as shared_avatar
     FROM posts p
     JOIN users u ON p.user_id = u.id
+    LEFT JOIN posts sp ON p.shared_post_id = sp.id
+    LEFT JOIN users su ON sp.user_id = su.id
     WHERE p.id = ?
   `;
   db.get(query, [userId, postId], callback);

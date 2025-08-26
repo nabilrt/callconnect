@@ -31,9 +31,9 @@ const router = express.Router();
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     let uploadPath = 'uploads/posts';
-    if (req.baseUrl.includes('groups')) {
+    if (req.originalUrl.includes('/groups/')) {
       uploadPath = 'uploads/groups';
-    } else if (req.baseUrl.includes('profile')) {
+    } else if (req.originalUrl.includes('/profile/')) {
       uploadPath = 'uploads/profiles';
     }
     cb(null, path.join(__dirname, '..', uploadPath));
@@ -77,23 +77,28 @@ router.post('/posts', upload.fields([
   { name: 'image', maxCount: 1 },
   { name: 'video', maxCount: 1 }
 ]), (req, res) => {
-  const { content, privacy = 'friends' } = req.body;
+  const { content, privacy = 'friends', shared_post_id, post_type: requestPostType } = req.body;
   const user_id = req.user.userId;
 
-  let post_type = 'text';
+  let post_type = requestPostType || 'text';
   let image = null;
   let video = null;
 
-  if (req.files?.image) {
-    post_type = 'image';
-    image = `posts/${req.files.image[0].filename}`;
-  } else if (req.files?.video) {
-    post_type = 'video';
-    video = `posts/${req.files.video[0].filename}`;
-  }
+  // Handle shared posts
+  if (post_type === 'shared' && shared_post_id) {
+    // For shared posts, we don't need image/video validation
+  } else {
+    if (req.files?.image) {
+      post_type = 'image';
+      image = `posts/${req.files.image[0].filename}`;
+    } else if (req.files?.video) {
+      post_type = 'video';
+      video = `posts/${req.files.video[0].filename}`;
+    }
 
-  if (!content && !image && !video) {
-    return res.status(400).json({ error: 'Post content, image, or video is required' });
+    if (!content && !image && !video && post_type !== 'shared') {
+      return res.status(400).json({ error: 'Post content, image, or video is required' });
+    }
   }
 
   createPost({
@@ -102,23 +107,32 @@ router.post('/posts', upload.fields([
     image,
     video,
     post_type,
-    privacy
+    privacy,
+    shared_post_id: shared_post_id ? parseInt(shared_post_id) : null
   }, (err, post) => {
     if (err) {
       console.error('Error creating post:', err);
       return res.status(500).json({ error: 'Failed to create post' });
     }
 
-    // Emit to all connected users
-    req.io.emit('new_post', {
-      ...post,
-      username: req.user.username,
-      avatar: req.user.avatar,
-      author_id: user_id,
-      user_liked: 0
-    });
+    // Get user data including avatar for socket emission
+    getUser('id', user_id, (userErr, userData) => {
+      if (userErr) {
+        console.error('Error fetching user data for socket:', userErr);
+        return res.status(500).json({ error: 'Failed to create post' });
+      }
 
-    res.status(201).json(post);
+      // Emit to all connected users
+      req.io.emit('new_post', {
+        ...post,
+        username: userData.username,
+        avatar: userData.avatar,
+        author_id: user_id,
+        user_liked: 0
+      });
+
+      res.status(201).json(post);
+    });
   });
 });
 
@@ -440,14 +454,22 @@ router.post('/groups/:groupId/messages', upload.single('file'), (req, res) => {
       return res.status(500).json({ error: 'Failed to send message' });
     }
 
-    // Emit to group members
-    req.io.to(`group_${groupId}`).emit('new_group_message', {
-      ...newMessage,
-      username: req.user.username,
-      avatar: req.user.avatar
-    });
+    // Get user data including avatar for socket emission
+    getUser('id', senderId, (userErr, userData) => {
+      if (userErr) {
+        console.error('Error fetching user data for socket:', userErr);
+        return res.status(500).json({ error: 'Failed to send message' });
+      }
 
-    res.status(201).json(newMessage);
+      // Emit to group members
+      req.io.to(`group_${groupId}`).emit('new_group_message', {
+        ...newMessage,
+        username: userData.username,
+        avatar: userData.avatar
+      });
+
+      res.status(201).json(newMessage);
+    });
   });
 });
 

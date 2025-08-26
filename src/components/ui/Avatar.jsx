@@ -35,11 +35,22 @@ const Avatar = ({
     }
   };
 
+  const getImageSrc = (src) => {
+    if (!src) return null;
+    // If src already starts with http, use it as is
+    if (src.startsWith('http')) return src;
+    // If src starts with /, add the base URL
+    if (src.startsWith('/')) return `http://localhost:3001${src}`;
+    // Otherwise, add base URL with /
+    return `http://localhost:3001/${src}`;
+  };
+
   const avatarContent = src ? (
     <img
-      src={`http://localhost:3001${src}`}
+      src={getImageSrc(src)}
       alt={alt || username}
       className="w-full h-full object-cover"
+      key={src} // Force re-render when src changes
     />
   ) : (
     <div className="w-full h-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-semibold">

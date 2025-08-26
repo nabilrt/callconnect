@@ -11,7 +11,7 @@ const ProfilePage = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
-  const { user, token } = useAuth();
+  const { user, token, socket } = useAuth();
 
   const isOwnProfile = !userId || parseInt(userId) === user?.id;
   const targetUserId = userId || user?.id;
@@ -22,6 +22,21 @@ const ProfilePage = () => {
       fetchUserPosts();
     }
   }, [targetUserId, token]);
+
+  // Socket event listeners for real-time updates
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on('post_deleted', handlePostDeleted);
+    socket.on('post_like_toggle', handlePostLikeToggle);
+    socket.on('new_comment', handleNewComment);
+
+    return () => {
+      socket.off('post_deleted');
+      socket.off('post_like_toggle');
+      socket.off('new_comment');
+    };
+  }, [socket]);
 
   const fetchProfile = async () => {
     try {
@@ -63,6 +78,18 @@ const ProfilePage = () => {
     const file = event.target.files[0];
     if (!file) return;
 
+    // Check file size (limit to 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size too large. Please choose a file smaller than 10MB.');
+      return;
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+
     const formData = new FormData();
     formData.append('cover', file);
 
@@ -78,9 +105,68 @@ const ProfilePage = () => {
       if (response.ok) {
         const result = await response.json();
         setProfile(prev => ({ ...prev, cover_photo: result.cover_photo }));
+        // Show success message briefly
+        const successDiv = document.createElement('div');
+        successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg z-[9999]';
+        successDiv.textContent = 'Cover photo updated successfully!';
+        document.body.appendChild(successDiv);
+        setTimeout(() => document.body.removeChild(successDiv), 3000);
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to update cover photo:', errorData);
+        alert('Failed to update cover photo. Please try again.');
       }
     } catch (error) {
       console.error('Error updating cover photo:', error);
+      alert('An error occurred while updating the cover photo.');
+    }
+  };
+
+  const handleAvatarChange = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size too large. Please choose a file smaller than 5MB.');
+      return;
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    try {
+      const response = await fetch('http://localhost:3001/api/auth/upload-avatar', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        setProfile(prev => ({ ...prev, avatar: result.avatar }));
+        // Show success message briefly
+        const successDiv = document.createElement('div');
+        successDiv.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg z-[9999]';
+        successDiv.textContent = 'Profile picture updated successfully!';
+        document.body.appendChild(successDiv);
+        setTimeout(() => document.body.removeChild(successDiv), 3000);
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to update avatar:', errorData);
+        alert('Failed to update profile picture. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error updating avatar:', error);
+      alert('An error occurred while updating the profile picture.');
     }
   };
 
@@ -139,9 +225,9 @@ const ProfilePage = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto">
         {/* Cover Photo & Profile Header */}
-        <div className="bg-white shadow-sm">
+        <div className="bg-white shadow-sm rounded-b-lg overflow-hidden mb-4">
           {/* Cover Photo */}
-          <div className="relative h-80 bg-gradient-to-r from-indigo-500 to-purple-600">
+          <div className="relative h-64 sm:h-80 bg-gradient-to-r from-indigo-500 to-purple-600">
             {profile.cover_photo && (
               <img
                 src={`http://localhost:3001/uploads/${profile.cover_photo}`}
@@ -150,7 +236,7 @@ const ProfilePage = () => {
               />
             )}
             {isOwnProfile && (
-              <div className="absolute bottom-4 right-4">
+              <div className="absolute top-4 right-4 z-20">
                 <input
                   type="file"
                   id="cover-upload"
@@ -160,7 +246,7 @@ const ProfilePage = () => {
                 />
                 <label
                   htmlFor="cover-upload"
-                  className="px-4 py-2 bg-white bg-opacity-90 text-gray-700 rounded-lg cursor-pointer hover:bg-opacity-100 transition-all flex items-center space-x-2"
+                  className="px-4 py-2 bg-black/60 text-white rounded-lg cursor-pointer hover:bg-black/70 transition-all flex items-center space-x-2 shadow-lg backdrop-blur-sm font-medium"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
@@ -173,55 +259,71 @@ const ProfilePage = () => {
           </div>
 
           {/* Profile Info */}
-          <div className="px-6 pb-6">
-            <div className="flex flex-col sm:flex-row sm:items-end sm:space-x-6 -mt-20">
+          <div className="relative bg-white px-4 sm:px-6 pt-12 pb-8">
+            {/* Background overlay to ensure full white background */}
+            <div className="absolute inset-0 bg-white -mt-8"></div>
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-end sm:space-x-6 -mt-12 sm:-mt-14">
               {/* Profile Picture */}
-              <div className="relative">
-                <div className="w-32 h-32 border-4 border-white rounded-full overflow-hidden bg-white">
+              <div className="relative flex-shrink-0 mx-auto sm:mx-0">
+                <div className="border-4 border-white rounded-full shadow-lg bg-white">
                   <Avatar 
                     src={profile.avatar}
                     username={profile.username}
-                    size="xl"
-                    className="w-full h-full"
+                    size="2xl"
+                    className="border-0 shadow-none"
                   />
                 </div>
                 {isOwnProfile && (
-                  <button className="absolute bottom-2 right-2 w-8 h-8 bg-gray-800 bg-opacity-70 text-white rounded-full flex items-center justify-center hover:bg-opacity-80">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    </svg>
-                  </button>
+                  <>
+                    <input
+                      type="file"
+                      id="avatar-upload"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="avatar-upload"
+                      className="absolute bottom-2 right-2 w-8 h-8 bg-gray-800 bg-opacity-70 text-white rounded-full flex items-center justify-center hover:bg-opacity-80 transition-all cursor-pointer"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                      </svg>
+                    </label>
+                  </>
                 )}
               </div>
 
               {/* Profile Details */}
-              <div className="flex-1 mt-4 sm:mt-0">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h1 className="text-3xl font-bold text-gray-900">{profile.username}</h1>
-                    <p className="text-gray-600 text-lg">{profile.email}</p>
+              <div className="flex-1 mt-6 sm:mt-4 sm:pb-4 text-center sm:text-left">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 truncate">{profile.username}</h1>
+                    <p className="text-gray-600 text-sm sm:text-base mt-1">{profile.email}</p>
                     {profile.bio && (
-                      <p className="text-gray-700 mt-2">{profile.bio}</p>
+                      <p className="text-gray-700 mt-2 text-sm sm:text-base max-w-lg">{profile.bio}</p>
                     )}
                   </div>
                   
-                  {isOwnProfile ? (
-                    <button
-                      onClick={() => setShowEditModal(true)}
-                      className="mt-4 sm:mt-0 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                      Edit Profile
-                    </button>
-                  ) : (
-                    <div className="mt-4 sm:mt-0 flex space-x-3">
-                      <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-                        Add Friend
+                  <div className="mt-4 sm:mt-0 flex-shrink-0">
+                    {isOwnProfile ? (
+                      <button
+                        onClick={() => setShowEditModal(true)}
+                        className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm sm:text-base"
+                      >
+                        Edit Profile
                       </button>
-                      <button className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors">
-                        Message
-                      </button>
-                    </div>
-                  )}
+                    ) : (
+                      <div className="flex space-x-3">
+                        <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
+                          Add Friend
+                        </button>
+                        <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm">
+                          Message
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Additional Info */}

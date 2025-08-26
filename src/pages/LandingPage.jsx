@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import LoginForm from '../components/auth/LoginForm';
 import RegisterForm from '../components/auth/RegisterForm';
+import Logo from '../components/ui/Logo';
 
 const LandingPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -10,20 +11,20 @@ const LandingPage = () => {
     {
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       ),
-      title: "Real-time Messaging",
-      description: "Chat instantly with your friends with real-time message delivery and read receipts."
+      title: "Rich Media Posts",
+      description: "Create engaging posts with photos, videos, and text. Share your moments and get real-time likes, comments, and shares."
     },
     {
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
       ),
-      title: "File Sharing",
-      description: "Share photos, videos, and documents seamlessly with drag-and-drop support."
+      title: "Instant Messaging",
+      description: "Chat with friends in real-time with instant message delivery and seamless conversations."
     },
     {
       icon: (
@@ -31,17 +32,35 @@ const LandingPage = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
         </svg>
       ),
-      title: "Friend Network",
-      description: "Connect with friends, send requests, and build your social network effortlessly."
+      title: "Friend Networks",
+      description: "Send and receive friend requests, build your social circle, and discover new connections."
     },
     {
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       ),
-      title: "Smart Notifications",
-      description: "Stay updated with intelligent notifications that keep you connected without overwhelming."
+      title: "Group Communities",
+      description: "Create or join groups around shared interests. Chat in group conversations and build communities."
+    },
+    {
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011 1v3M7 4H6a2 2 0 00-2 2v11a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1m0 0V1a1 1 0 00-1-1H8a1 1 0 00-1 1v3m8 0H8m0 0v2m0 0V4m0 2h8V4" />
+        </svg>
+      ),
+      title: "Stories & Updates",
+      description: "Share temporary stories and updates that disappear. Express yourself with photos and moments."
+    },
+    {
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      ),
+      title: "Custom Profiles",
+      description: "Personalize your profile with custom avatars, cover photos, and bios. Showcase who you are."
     }
   ];
 
@@ -64,14 +83,12 @@ const LandingPage = () => {
           <div className="bg-white border border-gray-200 rounded-3xl shadow-lg p-6 sm:p-8">
             {/* Logo */}
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-600 rounded-2xl mb-4">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
+              <div className="mb-4 flex justify-center">
+                <Logo size="lg" showText={false} />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 font-manrope">ChatSphere</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 font-manrope">SocialHub</h1>
               <p className="text-gray-600 mt-2 text-sm sm:text-base">
-                {isLogin ? 'Welcome back! Sign in to continue chatting' : 'Join thousands of users chatting daily'}
+                {isLogin ? 'Welcome back! Sign in to continue connecting' : 'Join thousands of users connecting daily'}
               </p>
             </div>
 
@@ -93,14 +110,7 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4 sm:py-6">
             {/* Logo */}
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </div>
-              <span className="text-xl sm:text-2xl font-bold text-gray-900 font-manrope">ChatSphere</span>
-            </div>
+            <Logo size="md" className="" />
 
             {/* Navigation */}
             <div className="flex items-center space-x-2 sm:space-x-4">
@@ -132,12 +142,12 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 font-manrope leading-tight animate-fade-in-up">
-              Connect & Chat with
-              <span className="text-indigo-600 block animate-fade-in-up" style={{animationDelay: '0.2s'}}>Your Friends</span>
+              Share, Connect & Chat
+              <span className="text-indigo-600 block animate-fade-in-up" style={{animationDelay: '0.2s'}}>All in One Place</span>
             </h1>
             <p className="mt-4 sm:mt-6 text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl lg:max-w-3xl mx-auto leading-relaxed px-4 animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-              Experience seamless communication with real-time messaging, file sharing, and smart notifications. 
-              Build meaningful connections in a modern, intuitive chat platform.
+              Create posts with photos and videos, chat in real-time, build friend networks, join groups, and share stories. 
+              Everything you need for authentic social connections in one beautifully designed platform.
             </p>
             <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 animate-fade-in-up" style={{animationDelay: '0.6s'}}>
               <button
@@ -147,7 +157,7 @@ const LandingPage = () => {
                 }}
                 className="bg-indigo-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-semibold hover:bg-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform"
               >
-                Start Chatting Free
+                Join SocialHub Free
               </button>
               <button
                 onClick={() => {
@@ -168,14 +178,14 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
-              Everything you need to stay connected
+              Everything you need for social connection
             </h2>
             <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
-              Powerful features designed for modern communication
+              Powerful social features designed to bring people together
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
             {features.map((feature, index) => (
               <div 
                 key={index} 
@@ -202,12 +212,12 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 text-center">
             <div className="animate-fade-in-up" style={{animationDelay: '0.2s'}}>
-              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-transform duration-300">10K+</div>
+              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-transform duration-300">25K+</div>
               <div className="text-base sm:text-xl text-gray-600 mt-2">Active Users</div>
             </div>
             <div className="animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-transform duration-300">1M+</div>
-              <div className="text-base sm:text-xl text-gray-600 mt-2">Messages Sent</div>
+              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-transform duration-300">500K+</div>
+              <div className="text-base sm:text-xl text-gray-600 mt-2">Posts Shared</div>
             </div>
             <div className="animate-fade-in-up" style={{animationDelay: '0.6s'}}>
               <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-transform duration-300">99.9%</div>
@@ -222,7 +232,7 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
-              How ChatSphere Works
+              How SocialHub Works
             </h2>
             <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
               Get started in three simple steps
@@ -243,18 +253,18 @@ const LandingPage = () => {
               <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 transition-all duration-300">
                 <span className="text-2xl font-bold">2</span>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope">Connect Friends</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope">Build Your Network</h3>
               <p className="text-gray-600 leading-relaxed">
-                Find and add friends using their username or email. Build your network effortlessly.
+                Send friend requests, customize your profile, and join groups that match your interests.
               </p>
             </div>
             <div className="text-center animate-fade-in-up" style={{animationDelay: '0.6s'}}>
               <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 transition-all duration-300">
                 <span className="text-2xl font-bold">3</span>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope">Start Chatting</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope">Share & Connect</h3>
               <p className="text-gray-600 leading-relaxed">
-                Enjoy instant messaging, file sharing, and real-time notifications with your friends.
+                Create posts with photos and videos, chat with friends, and share stories. Engage with your community!
               </p>
             </div>
           </div>
@@ -285,7 +295,7 @@ const LandingPage = () => {
                 </div>
               </div>
               <p className="text-gray-600 mb-4">
-                "ChatSphere has completely transformed how I communicate with my team. The real-time features and clean interface make it a joy to use every day."
+                "SocialHub has completely transformed how I connect with my friends. The social feed and messaging features make it easy to stay in touch with everyone."
               </p>
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -309,7 +319,7 @@ const LandingPage = () => {
                 </div>
               </div>
               <p className="text-gray-600 mb-4">
-                "The file sharing feature is incredible! I can easily share documents, images, and videos with my friends without any hassle. Highly recommended!"
+                "I love creating posts with photos and videos! The likes and comments make it so engaging. The groups feature helps me stay connected with my hobbies."
               </p>
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -333,7 +343,7 @@ const LandingPage = () => {
                 </div>
               </div>
               <p className="text-gray-600 mb-4">
-                "I love the smart notifications! They keep me updated without being overwhelming. The interface is beautiful and intuitive to use."
+                "The stories feature is amazing for sharing quick updates! My custom profile with cover photo really shows my personality. Love the interface!"
               </p>
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -358,7 +368,7 @@ const LandingPage = () => {
                 Your Privacy & Security Matter
               </h2>
               <p className="text-base sm:text-lg text-gray-600 leading-relaxed mb-8">
-                At ChatSphere, we prioritize your privacy and security above all else. Our platform uses industry-leading 
+                At SocialHub, we prioritize your privacy and security above all else. Our platform uses industry-leading 
                 encryption and security measures to protect your conversations and data.
               </p>
               <div className="space-y-4">
@@ -444,14 +454,7 @@ const LandingPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 mb-8">
             {/* Brand Section */}
             <div className="lg:col-span-2">
-              <div className="flex items-center space-x-3 mb-4">
-                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-                  <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                </div>
-                <span className="text-2xl font-bold font-manrope">ChatSphere</span>
-              </div>
+              <Logo size="md" variant="white" className="mb-4" />
               <p className="text-gray-400 text-base leading-relaxed max-w-md">
                 Experience seamless communication with real-time messaging, file sharing, and smart notifications. 
                 Connect with friends in a modern, intuitive platform designed for meaningful conversations.
@@ -509,7 +512,7 @@ const LandingPage = () => {
           <div className="pt-8 border-t border-gray-800">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="text-gray-400 text-sm">
-                © 2024 ChatSphere. All rights reserved. Made with ❤️ for better communication.
+                © 2024 SocialHub. All rights reserved. Made with ❤️ for meaningful connections.
               </div>
               <div className="flex items-center space-x-6 text-sm">
                 <a href="#privacy" className="text-gray-400 hover:text-white transition-colors">Privacy</a>

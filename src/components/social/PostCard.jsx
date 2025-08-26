@@ -2,12 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Avatar from '../ui/Avatar';
 import CommentSection from './CommentSection';
+import ShareModal from './ShareModal';
+import SharedPostCard from './SharedPostCard';
+import ConfirmationModal from '../ui/ConfirmationModal';
 
 const PostCard = ({ post, onLike, onComment, onDelete }) => {
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
   const [isLiking, setIsLiking] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { user, token } = useAuth();
 
   const formatTimestamp = (timestamp) => {
@@ -47,8 +52,6 @@ const PostCard = ({ post, onLike, onComment, onDelete }) => {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this post?')) return;
-
     try {
       const response = await fetch(`http://localhost:3001/api/social/posts/${post.id}`, {
         method: 'DELETE',
@@ -171,7 +174,10 @@ const PostCard = ({ post, onLike, onComment, onDelete }) => {
               {showMenu && (
                 <div className="absolute top-full right-0 mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                   <button
-                    onClick={handleDelete}
+                    onClick={() => {
+                      setShowDeleteConfirm(true);
+                      setShowMenu(false);
+                    }}
                     className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 first:rounded-t-lg last:rounded-b-lg transition-colors"
                   >
                     Delete Post
@@ -188,7 +194,11 @@ const PostCard = ({ post, onLike, onComment, onDelete }) => {
         {post.content && (
           <p className="text-gray-900 whitespace-pre-wrap mb-2">{post.content}</p>
         )}
-        {renderMedia()}
+        {post.post_type === 'shared' ? (
+          <SharedPostCard sharedPost={post} />
+        ) : (
+          renderMedia()
+        )}
       </div>
 
       {/* Stats */}
@@ -243,7 +253,10 @@ const PostCard = ({ post, onLike, onComment, onDelete }) => {
           <span className="font-medium">Comment</span>
         </button>
 
-        <button className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+        <button 
+          onClick={() => setShowShareModal(true)}
+          className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
           </svg>
@@ -260,6 +273,25 @@ const PostCard = ({ post, onLike, onComment, onDelete }) => {
           onComment={onComment}
         />
       )}
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        post={post}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDelete}
+        title="Delete Post"
+        message="Are you sure you want to delete this post? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        type="danger"
+      />
     </div>
   );
 };
