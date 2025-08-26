@@ -26,12 +26,12 @@ const HomePage = () => (
 
 const DashboardPage = () => {
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Sidebar Navigation */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Top Navigation */}
       <Navigation />
 
       {/* Main Content Area */}
-      <div className="flex-1">
+      <div className="pt-16">
         {/* Routes */}
         <Routes>
           <Route path="/feed" element={<FeedPage />} />
