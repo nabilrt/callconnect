@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import PostCard from '../components/social/PostCard';
 import CreatePost from '../components/social/CreatePost';
 import Stories from '../components/social/Stories';
+import FriendDiscovery from '../components/friends/FriendDiscovery';
 
 const FeedPage = () => {
   const [posts, setPosts] = useState([]);
@@ -102,8 +103,10 @@ const FeedPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Main Feed Container */}
-      <div className="max-w-2xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="flex gap-6">
+          {/* Main Feed Container */}
+          <div className="flex-1 max-w-2xl">
         {/* Stories Section */}
         <Stories />
 
@@ -154,6 +157,15 @@ const FeedPage = () => {
               <p className="text-gray-500">Be the first to share something with your friends!</p>
             </div>
           )}
+          </div>
+          </div>
+          
+          {/* Right Sidebar - Friend Discovery */}
+          <div className="hidden lg:block w-80">
+            <div className="sticky top-20">
+              <FriendDiscovery />
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -16,6 +16,7 @@ const {
   sendMessage,
   getMessages,
   markMessagesAsRead,
+  createNotification,
 } = require('../database/db');
 const { generateToken, authenticateToken } = require('../middleware/auth');
 
@@ -284,6 +285,8 @@ router.post('/friend-request/:requestId/respond', authenticateToken, (req, res) 
   const { requestId } = req.params;
   const { status } = req.body;
   
+  console.log('Friend request response received:', { requestId, status, userId: req.user.userId });
+  
   if (!['accepted', 'rejected'].includes(status)) {
     return res.status(400).json({ error: 'Invalid status' });
   }
@@ -291,10 +294,14 @@ router.post('/friend-request/:requestId/respond', authenticateToken, (req, res) 
   // First get the friend request details
   getFriendRequests(req.user.userId, 'received', (err, requests) => {
     if (err) {
+      console.error('Error getting friend requests:', err);
       return res.status(500).json({ error: 'Database error' });
     }
 
-    const request = requests.find(r => r.id == requestId);
+    console.log('Found requests for user:', requests);
+    const request = requests.find(r => r.request_id == requestId);
+    console.log('Looking for request ID:', requestId, 'Found request:', request);
+    
     if (!request) {
       return res.status(404).json({ error: 'Friend request not found' });
     }
@@ -534,6 +541,197 @@ router.get('/profile', authenticateToken, (req, res) => {
       status: user.status
     });
   });
+});
+
+router.delete('/delete-account', authenticateToken, async (req, res) => {
+  try {
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ error: 'Password is required to delete your account' });
+    }
+
+    // Get current user data
+    getUser('id', req.user.userId, async (err, user) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Verify password
+      const isPasswordValid = await bcrypt.compare(password, user.password);
+      if (!isPasswordValid) {
+        return res.status(400).json({ error: 'Incorrect password' });
+      }
+
+      // Start database transaction for complete deletion
+      const db = require('../database/db').db;
+      
+      db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
+        
+        try {
+          // Delete user's uploaded files from filesystem
+          const cleanupUserFiles = () => {
+            try {
+              // Clean up avatar
+              if (user.avatar) {
+                const avatarPath = path.join(__dirname, '..', user.avatar);
+                if (fs.existsSync(avatarPath)) {
+                  fs.unlinkSync(avatarPath);
+                  console.log(`Deleted avatar: ${avatarPath}`);
+                }
+              }
+              
+              // Clean up cover photo
+              if (user.cover_photo) {
+                const coverPath = path.join(__dirname, '..', `uploads/profiles/${user.cover_photo}`);
+                if (fs.existsSync(coverPath)) {
+                  fs.unlinkSync(coverPath);
+                  console.log(`Deleted cover photo: ${coverPath}`);
+                }
+              }
+              
+              // Note: For production, you might want to also clean up:
+              // - Post images/videos
+              // - Story media
+              // - Message attachments
+              // This would require querying those tables first to get file paths
+              
+            } catch (fileError) {
+              console.error('Error cleaning up user files:', fileError);
+              // Don't fail the account deletion if file cleanup fails
+            }
+          };
+          
+          cleanupUserFiles();
+          
+          // The CASCADE DELETE constraints should handle most relationships
+          // But let's be explicit for important data:
+          
+          // Delete friend requests (both sent and received)
+          db.run('DELETE FROM friend_requests WHERE sender_id = ? OR receiver_id = ?', 
+                [req.user.userId, req.user.userId]);
+          
+          // Delete friendships
+          db.run('DELETE FROM friendships WHERE user1_id = ? OR user2_id = ?', 
+                [req.user.userId, req.user.userId]);
+          
+          // Delete messages (both sent and received)
+          db.run('DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?', 
+                [req.user.userId, req.user.userId]);
+          
+          // Delete posts and related data
+          db.run('DELETE FROM post_comments WHERE user_id = ?', [req.user.userId]);
+          db.run('DELETE FROM post_likes WHERE user_id = ?', [req.user.userId]);
+          db.run('DELETE FROM comment_likes WHERE user_id = ?', [req.user.userId]);
+          db.run('DELETE FROM posts WHERE user_id = ?', [req.user.userId]);
+          
+          // Delete stories and story views
+          db.run('DELETE FROM story_views WHERE user_id = ?', [req.user.userId]);
+          db.run('DELETE FROM stories WHERE user_id = ?', [req.user.userId]);
+          
+          // Delete group-related data
+          db.run('DELETE FROM group_members WHERE user_id = ?', [req.user.userId]);
+          db.run('DELETE FROM group_messages WHERE sender_id = ?', [req.user.userId]);
+          db.run('DELETE FROM group_posts WHERE user_id = ?', [req.user.userId]);
+          db.run('DELETE FROM group_post_comments WHERE user_id = ?', [req.user.userId]);
+          db.run('DELETE FROM group_post_likes WHERE user_id = ?', [req.user.userId]);
+          
+          // Delete notifications
+          db.run('DELETE FROM notifications WHERE user_id = ?', [req.user.userId]);
+          
+          // Delete call history
+          db.run('DELETE FROM call_history WHERE caller_id = ? OR receiver_id = ?', 
+                [req.user.userId, req.user.userId]);
+          
+          // Finally, delete the user account
+          db.run('DELETE FROM users WHERE id = ?', [req.user.userId], function(deleteErr) {
+            if (deleteErr) {
+              console.error('Error deleting user:', deleteErr);
+              db.run('ROLLBACK');
+              return res.status(500).json({ error: 'Error deleting account' });
+            }
+
+            // Commit the transaction
+            db.run('COMMIT');
+            console.log(`User account ${req.user.userId} (${user.username}) deleted successfully`);
+            
+            res.json({ message: 'Account deleted successfully' });
+          });
+          
+        } catch (deleteError) {
+          console.error('Error during account deletion:', deleteError);
+          db.run('ROLLBACK');
+          return res.status(500).json({ error: 'Error deleting account' });
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Delete account error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+router.post('/change-password', authenticateToken, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password are required' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+
+    // Get current user data
+    getUser('id', req.user.userId, async (err, user) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      // Verify current password
+      const isCurrentPasswordValid = await bcrypt.compare(currentPassword, user.password);
+      if (!isCurrentPasswordValid) {
+        return res.status(400).json({ error: 'Current password is incorrect' });
+      }
+
+      // Check if new password is different from current
+      const isSamePassword = await bcrypt.compare(newPassword, user.password);
+      if (isSamePassword) {
+        return res.status(400).json({ error: 'New password must be different from current password' });
+      }
+
+      // Hash new password
+      const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+      // Update password in database
+      const db = require('../database/db').db;
+      db.run(
+        `UPDATE users SET password = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+        [hashedNewPassword, req.user.userId],
+        function(updateErr) {
+          if (updateErr) {
+            console.error('Error updating password:', updateErr);
+            return res.status(500).json({ error: 'Error updating password' });
+          }
+
+          res.json({ message: 'Password changed successfully' });
+        }
+      );
+    });
+  } catch (error) {
+    console.error('Change password error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

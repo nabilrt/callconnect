@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
+import PasswordInput from '../ui/PasswordInput';
 
 const LoginForm = ({ onSwitchToRegister }) => {
   const [formData, setFormData] = useState({
@@ -55,9 +56,8 @@ const LoginForm = ({ onSwitchToRegister }) => {
           error={errors.email}
         />
 
-        <Input
+        <PasswordInput
           label="Password"
-          type="password"
           name="password"
           value={formData.password}
           onChange={handleChange}

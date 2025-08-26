@@ -39,6 +39,8 @@ const FriendRequests = () => {
       if (receivedResponse.ok && sentResponse.ok) {
         const received = await receivedResponse.json();
         const sent = await sentResponse.json();
+        console.log('Received friend requests:', received);
+        console.log('Sent friend requests:', sent);
         setReceivedRequests(received);
         setSentRequests(sent);
       }
@@ -61,6 +63,7 @@ const FriendRequests = () => {
 
   const respondToRequest = async (requestId, status, senderId) => {
     try {
+      console.log('Responding to friend request:', { requestId, status, senderId });
       const response = await fetch(`http://localhost:3001/api/auth/friend-request/${requestId}/respond`, {
         method: 'POST',
         headers: {
@@ -116,7 +119,7 @@ const FriendRequests = () => {
           
           <div className="divide-y divide-gray-200">
             {receivedRequests.map((request) => (
-              <div key={request.id} className="p-4 hover:bg-gray-50">
+              <div key={request.request_id || request.id} className="p-4 hover:bg-gray-50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <Avatar 
@@ -168,7 +171,7 @@ const FriendRequests = () => {
           
           <div className="divide-y divide-gray-200">
             {sentRequests.map((request) => (
-              <div key={request.id} className="p-4">
+              <div key={request.request_id || request.id} className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <Avatar 

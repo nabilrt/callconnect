@@ -12,6 +12,8 @@ const ProfilePage = () => {
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [friendshipStatus, setFriendshipStatus] = useState(null);
+  const [sendingRequest, setSendingRequest] = useState(false);
   const { user, token, socket, updateAvatar } = useAuth();
 
   const isOwnProfile = !userId || parseInt(userId) === user?.id;
@@ -21,6 +23,9 @@ const ProfilePage = () => {
     if (targetUserId) {
       fetchProfile();
       fetchUserPosts();
+      if (!isOwnProfile) {
+        checkFriendshipStatus();
+      }
     }
   }, [targetUserId, token]);
 
@@ -74,6 +79,162 @@ const ProfilePage = () => {
       console.error('Error fetching user posts:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const checkFriendshipStatus = async () => {
+    try {
+      // First try to get friend status from the friends list
+      try {
+        const friendsResponse = await fetch('http://localhost:3001/api/auth/friends', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (friendsResponse.ok) {
+          const friends = await friendsResponse.json();
+          const isFriend = friends.some(friend => friend.id === parseInt(targetUserId));
+          
+          if (isFriend) {
+            setFriendshipStatus({ status: 'friends' });
+            return;
+          }
+        }
+      } catch (friendsError) {
+        console.log('Could not fetch friends list');
+      }
+
+      // Try to get friend requests to check if there's a pending request
+      try {
+        const sentRequestsResponse = await fetch('http://localhost:3001/api/auth/friend-requests?type=sent', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (sentRequestsResponse.ok) {
+          const sentRequests = await sentRequestsResponse.json();
+          const hasSentRequest = sentRequests.some(req => req.receiver_id === parseInt(targetUserId));
+          
+          if (hasSentRequest) {
+            setFriendshipStatus({ status: 'pending_sent' });
+            return;
+          }
+        }
+      } catch (sentError) {
+        console.log('Could not fetch sent requests');
+      }
+
+      // Try to get received requests
+      try {
+        const receivedRequestsResponse = await fetch('http://localhost:3001/api/auth/friend-requests?type=received', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (receivedRequestsResponse.ok) {
+          const receivedRequests = await receivedRequestsResponse.json();
+          const hasReceivedRequest = receivedRequests.some(req => req.sender_id === parseInt(targetUserId));
+          
+          if (hasReceivedRequest) {
+            setFriendshipStatus({ status: 'pending_received' });
+            return;
+          }
+        }
+      } catch (receivedError) {
+        console.log('Could not fetch received requests');
+      }
+
+      // Default to no friendship
+      setFriendshipStatus({ status: 'none' });
+      
+    } catch (error) {
+      console.error('Error checking friendship status:', error);
+      // Default to no friendship on error
+      setFriendshipStatus({ status: 'none' });
+    }
+  };
+
+  const sendFriendRequest = async () => {
+    try {
+      setSendingRequest(true);
+      
+      const response = await fetch('http://localhost:3001/api/auth/friend-request', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ receiverId: targetUserId }),
+      });
+
+      if (response.ok) {
+        setFriendshipStatus({ status: 'pending_sent' });
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to send friend request' }));
+        alert(errorData.error || 'Failed to send friend request. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending friend request:', error);
+      if (error.message === 'Failed to fetch') {
+        alert('Cannot connect to server. Please check your internet connection and try again.');
+      } else {
+        alert('Failed to send friend request. Please try again.');
+      }
+    } finally {
+      setSendingRequest(false);
+    }
+  };
+
+  const acceptFriendRequest = async () => {
+    try {
+      // First get the received requests to find the request ID
+      const receivedRequestsResponse = await fetch('http://localhost:3001/api/auth/friend-requests?type=received', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (receivedRequestsResponse.ok) {
+        const receivedRequests = await receivedRequestsResponse.json();
+        const request = receivedRequests.find(req => req.sender_id === parseInt(targetUserId));
+        
+        if (request) {
+          const response = await fetch(`http://localhost:3001/api/auth/friend-request/${request.request_id}/respond`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status: 'accepted' }),
+          });
+
+          if (response.ok) {
+            setFriendshipStatus({ status: 'friends' });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error accepting friend request:', error);
+    }
+  };
+
+  const removeFriend = async () => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/auth/friends/${targetUserId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        setFriendshipStatus({ status: 'none' });
+      }
+    } catch (error) {
+      console.error('Error removing friend:', error);
     }
   };
 
@@ -221,6 +382,59 @@ const ProfilePage = () => {
     );
   }
 
+  // Privacy logic
+  const canViewPosts = isOwnProfile || 
+    profile.privacy_setting === 'public' || 
+    (profile.privacy_setting === 'friends' && friendshipStatus?.status === 'friends');
+
+  const canViewFullProfile = isOwnProfile || 
+    profile.privacy_setting === 'public' || 
+    (profile.privacy_setting === 'friends' && friendshipStatus?.status === 'friends');
+
+  const renderFriendButton = () => {
+    if (isOwnProfile) return null;
+
+    switch (friendshipStatus?.status) {
+      case 'friends':
+        return (
+          <button 
+            onClick={removeFriend}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+          >
+            Unfriend
+          </button>
+        );
+      case 'pending_sent':
+        return (
+          <button 
+            disabled
+            className="px-4 py-2 bg-gray-300 text-gray-500 rounded-lg text-sm cursor-not-allowed"
+          >
+            Request Sent
+          </button>
+        );
+      case 'pending_received':
+        return (
+          <button 
+            onClick={acceptFriendRequest}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+          >
+            Accept Request
+          </button>
+        );
+      default:
+        return (
+          <button 
+            onClick={sendFriendRequest}
+            disabled={sendingRequest}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm disabled:opacity-50"
+          >
+            {sendingRequest ? 'Sending...' : 'Add Friend'}
+          </button>
+        );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto">
@@ -315,12 +529,12 @@ const ProfilePage = () => {
                       </button>
                     ) : (
                       <div className="flex space-x-3">
-                        <button className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm">
-                          Add Friend
-                        </button>
-                        <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm">
-                          Message
-                        </button>
+                        {renderFriendButton()}
+                        {friendshipStatus?.status === 'friends' && (
+                          <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm">
+                            Message
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -372,19 +586,20 @@ const ProfilePage = () => {
             </div>
           )}
           
-          {posts.length > 0 ? (
-            <div className="space-y-6">
-              {posts.map((post) => (
-                <PostCard 
-                  key={post.id} 
-                  post={post}
-                  onLike={handlePostLikeToggle}
-                  onComment={handleNewComment}
-                  onDelete={handlePostDeleted}
-                />
-              ))}
-            </div>
-          ) : (
+          {canViewPosts ? (
+            posts.length > 0 ? (
+              <div className="space-y-6">
+                {posts.map((post) => (
+                  <PostCard 
+                    key={post.id} 
+                    post={post}
+                    onLike={handlePostLikeToggle}
+                    onComment={handleNewComment}
+                    onDelete={handlePostDeleted}
+                  />
+                ))}
+              </div>
+            ) : (
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
               <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 7a2 2 0 012-2h10a2 2 0 012 2v2M5 11V9a2 2 0 012-2h10a2 2 0 012 2v2" />
@@ -404,6 +619,18 @@ const ProfilePage = () => {
                   Create Your First Post
                 </button>
               )}
+            </div>
+            )
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+              <svg className="w-16 h-16 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Private Profile</h3>
+              <p className="text-gray-500 mb-4">
+                This user's posts are private. You need to be friends to see their content.
+              </p>
+              {friendshipStatus?.status !== 'friends' && renderFriendButton()}
             </div>
           )}
         </div>

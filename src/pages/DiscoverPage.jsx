@@ -10,6 +10,7 @@ const DiscoverPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [sentRequests, setSentRequests] = useState(new Set());
+  const [receivedRequests, setReceivedRequests] = useState(new Set());
   const [friends, setFriends] = useState(new Set());
   
   const { token, socket, user } = useAuth();
@@ -17,6 +18,7 @@ const DiscoverPage = () => {
   useEffect(() => {
     fetchUsers();
     fetchSentRequests();
+    fetchReceivedRequests();
     fetchFriends();
   }, []);
 
@@ -79,6 +81,73 @@ const DiscoverPage = () => {
     }
   };
 
+  const fetchReceivedRequests = async () => {
+    try {
+      const response = await fetch('http://localhost:3001/api/auth/friend-requests?type=received', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const receiverIds = new Set(data.map(req => req.sender_id));
+        setReceivedRequests(receiverIds);
+      }
+    } catch (error) {
+      console.error('Error fetching received requests:', error);
+    }
+  };
+
+  const respondToFriendRequest = async (senderId, status) => {
+    try {
+      // First get the request ID for this sender
+      const receivedResponse = await fetch('http://localhost:3001/api/auth/friend-requests?type=received', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (receivedResponse.ok) {
+        const receivedRequestsData = await receivedResponse.json();
+        const request = receivedRequestsData.find(req => req.sender_id === senderId);
+        
+        if (request) {
+          const response = await fetch(`http://localhost:3001/api/auth/friend-request/${request.request_id}/respond`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ status }),
+          });
+
+          if (response.ok) {
+            setReceivedRequests(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(senderId);
+              return newSet;
+            });
+            
+            if (status === 'accepted') {
+              setFriends(prev => new Set(prev).add(senderId));
+            }
+          } else {
+            const errorData = await response.json().catch(() => ({ error: 'Failed to respond to friend request' }));
+            alert(errorData.error || `Failed to ${status === 'accepted' ? 'accept' : 'reject'} friend request.`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error responding to friend request:', error);
+      if (error.message === 'Failed to fetch') {
+        alert('Cannot connect to server. Please check your internet connection and try again.');
+      } else {
+        alert('Failed to respond to friend request. Please try again.');
+      }
+    }
+  };
+
   const filterUsers = () => {
     if (!searchTerm.trim()) {
       setFilteredUsers(users);
@@ -108,9 +177,17 @@ const DiscoverPage = () => {
         if (socket) {
           socket.emit('friend_request_sent', { receiverId });
         }
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to send friend request' }));
+        alert(errorData.error || 'Failed to send friend request. Please try again.');
       }
     } catch (error) {
       console.error('Error sending friend request:', error);
+      if (error.message === 'Failed to fetch') {
+        alert('Cannot connect to server. Please check your internet connection and try again.');
+      } else {
+        alert('Failed to send friend request. Please try again.');
+      }
     }
   };
 
@@ -211,6 +288,31 @@ const DiscoverPage = () => {
                         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
                       </svg>
                       <span className="text-sm font-medium">Request Sent</span>
+                    </div>
+                  ) : receivedRequests.has(discoveredUser.id) ? (
+                    <div className="flex space-x-2">
+                      <Button
+                        onClick={() => respondToFriendRequest(discoveredUser.id, 'accepted')}
+                        variant="success"
+                        size="sm"
+                        className="flex items-center space-x-1"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <span>Accept</span>
+                      </Button>
+                      <Button
+                        onClick={() => respondToFriendRequest(discoveredUser.id, 'rejected')}
+                        variant="ghost"
+                        size="sm"
+                        className="flex items-center space-x-1 text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                        <span>Reject</span>
+                      </Button>
                     </div>
                   ) : (
                     <Button

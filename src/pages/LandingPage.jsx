@@ -14,8 +14,8 @@ const LandingPage = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       ),
-      title: "Rich Media Posts",
-      description: "Create engaging posts with photos, videos, and text. Share your moments and get real-time likes, comments, and shares."
+      title: "Share Your Moments",
+      description: "Post photos, videos, and updates to keep your network engaged and informed."
     },
     {
       icon: (
@@ -23,8 +23,8 @@ const LandingPage = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
         </svg>
       ),
-      title: "Instant Messaging",
-      description: "Chat with friends in real-time with instant message delivery and seamless conversations."
+      title: "Real-time Messaging",
+      description: "Chat instantly with friends and family with our lightning-fast messaging system."
     },
     {
       icon: (
@@ -41,8 +41,8 @@ const LandingPage = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       ),
-      title: "Group Communities",
-      description: "Create or join groups around shared interests. Chat in group conversations and build communities."
+      title: "Create & Join Groups",
+      description: "Build communities around your interests and connect with like-minded people."
     },
     {
       icon: (
@@ -76,7 +76,7 @@ const LandingPage = () => {
             <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to home
+            Back to Home
           </button>
 
           {/* Auth Form */}
@@ -106,7 +106,7 @@ const LandingPage = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
-      <header className="border-b border-gray-100">
+      <header className="border-b border-gray-100 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4 sm:py-6">
             {/* Logo */}
@@ -114,6 +114,7 @@ const LandingPage = () => {
 
             {/* Navigation */}
             <div className="flex items-center space-x-2 sm:space-x-4">
+
               <button
                 onClick={() => {
                   setIsLogin(true);
@@ -138,7 +139,7 @@ const LandingPage = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-gray-50 overflow-hidden">
+      <section className="py-12 sm:py-16 lg:py-20 bg-gray-50overflow-hidden">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 font-manrope leading-tight animate-fade-in-up">
@@ -177,10 +178,10 @@ const LandingPage = () => {
       <section className="py-12 sm:py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope ">
               Everything you need for social connection
             </h2>
-            <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
+            <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4 ">
               Powerful social features designed to bring people together
             </p>
           </div>
@@ -189,16 +190,16 @@ const LandingPage = () => {
             {features.map((feature, index) => (
               <div 
                 key={index} 
-                className="text-center p-4 sm:p-6 rounded-2xl border border-gray-100 hover:border-gray-200 transition-all duration-300 hover:shadow-lg hover:-translate-y-2 transform animate-fade-in-up group"
+                className="text-center p-4 sm:p-6 rounded-2xl border border-gray-100 hover:border-gray-200 dark:hover:border-gray-600 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-2 transform animate-fade-in-up group"
                 style={{animationDelay: `${0.2 * index}s`}}
               >
-                <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl mb-4 group-hover:scale-110 transition-transform duration-300">
+                <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl mb-4 group-hover:scale-110 transition-all duration-300">
                   {feature.icon}
                 </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3 font-manrope">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3 font-manrope ">
                   {feature.title}
                 </h3>
-                <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                <p className="text-sm sm:text-base text-gray-600 leading-relaxed ">
                   {feature.description}
                 </p>
               </div>
@@ -212,16 +213,16 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 text-center">
             <div className="animate-fade-in-up" style={{animationDelay: '0.2s'}}>
-              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-transform duration-300">25K+</div>
-              <div className="text-base sm:text-xl text-gray-600 mt-2">Active Users</div>
+              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-all duration-300">25K+</div>
+              <div className="text-base sm:text-xl text-gray-600 mt-2 ">Active Users</div>
             </div>
             <div className="animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-transform duration-300">500K+</div>
-              <div className="text-base sm:text-xl text-gray-600 mt-2">Posts Shared</div>
+              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-all duration-300">500K+</div>
+              <div className="text-base sm:text-xl text-gray-600 mt-2 ">Posts Shared</div>
             </div>
             <div className="animate-fade-in-up" style={{animationDelay: '0.6s'}}>
-              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-transform duration-300">99.9%</div>
-              <div className="text-base sm:text-xl text-gray-600 mt-2">Uptime</div>
+              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-all duration-300">99.9%</div>
+              <div className="text-base sm:text-xl text-gray-600 mt-2 ">Uptime</div>
             </div>
           </div>
         </div>
@@ -231,39 +232,39 @@ const LandingPage = () => {
       <section className="py-12 sm:py-16 lg:py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope ">
               How SocialHub Works
             </h2>
-            <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
+            <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4 ">
               Get started in three simple steps
             </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
             <div className="text-center animate-fade-in-up" style={{animationDelay: '0.2s'}}>
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 transition-all duration-300">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-all duration-300">
                 <span className="text-2xl font-bold">1</span>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope">Sign Up</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope ">Sign Up</h3>
+              <p className="text-gray-600 leading-relaxed ">
                 Create your account in seconds with just your email and username. No complex setup required.
               </p>
             </div>
             <div className="text-center animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 transition-all duration-300">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-all duration-300">
                 <span className="text-2xl font-bold">2</span>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope">Build Your Network</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope ">Build Your Network</h3>
+              <p className="text-gray-600 leading-relaxed ">
                 Send friend requests, customize your profile, and join groups that match your interests.
               </p>
             </div>
             <div className="text-center animate-fade-in-up" style={{animationDelay: '0.6s'}}>
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 transition-all duration-300">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-all duration-300">
                 <span className="text-2xl font-bold">3</span>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope">Share & Connect</h3>
-              <p className="text-gray-600 leading-relaxed">
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope ">Share & Connect</h3>
+              <p className="text-gray-600 leading-relaxed ">
                 Create posts with photos and videos, chat with friends, and share stories. Engage with your community!
               </p>
             </div>
@@ -275,10 +276,10 @@ const LandingPage = () => {
       <section className="py-12 sm:py-16 lg:py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
+            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope ">
               What Our Users Say
             </h2>
-            <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
+            <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4 ">
               Join thousands of satisfied users worldwide
             </p>
           </div>
