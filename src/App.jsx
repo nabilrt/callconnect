@@ -1,5 +1,5 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
@@ -11,6 +11,27 @@ import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import SecurityPage from './pages/SecurityPage';
 import Logo from './components/ui/Logo';
+
+const TitleUpdater = () => {
+  const location = useLocation();
+  
+  useEffect(() => {
+    const pathToTitle = {
+      '/': 'SocialHub - Connect & Share',
+      '/about': 'About - SocialHub',
+      '/features': 'Features - SocialHub',
+      '/contact': 'Contact - SocialHub',
+      '/help': 'Help - SocialHub',
+      '/privacy': 'Privacy Policy - SocialHub',
+      '/terms': 'Terms of Service - SocialHub',
+      '/security': 'Security - SocialHub'
+    };
+    
+    document.title = pathToTitle[location.pathname] || 'SocialHub - Connect & Share';
+  }, [location.pathname]);
+  
+  return null;
+};
 
 const AppContent = () => {
   const { isAuthenticated, loading } = useAuth();
@@ -31,6 +52,7 @@ const AppContent = () => {
 
   return (
     <Router>
+      <TitleUpdater />
       {isAuthenticated ? (
         <DashboardPage />
       ) : (

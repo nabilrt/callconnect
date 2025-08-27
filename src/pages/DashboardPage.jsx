@@ -1,5 +1,5 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { Routes, Route, useLocation } from 'react-router-dom';
 import Navigation from '../components/layout/Navigation';
 import PageTransition from '../components/layout/PageTransition';
 import Profile from '../components/dashboard/Profile';
@@ -25,6 +25,29 @@ const HomePage = () => (
 );
 
 const DashboardPage = () => {
+  const location = useLocation();
+  
+  useEffect(() => {
+    const pathToTitle = {
+      '/': 'Feed - SocialHub',
+      '/feed': 'Feed - SocialHub',
+      '/profile': 'Profile - SocialHub',
+      '/friends': 'Friends - SocialHub',
+      '/groups': 'Groups - SocialHub',
+      '/messages': 'Messages - SocialHub',
+      '/admin': 'Admin Panel - SocialHub'
+    };
+    
+    // Handle dynamic routes
+    if (location.pathname.startsWith('/profile/')) {
+      document.title = 'Profile - SocialHub';
+    } else if (location.pathname.startsWith('/groups/')) {
+      document.title = 'Group - SocialHub';
+    } else {
+      document.title = pathToTitle[location.pathname] || 'SocialHub - Connect & Share';
+    }
+  }, [location.pathname]);
+  
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
