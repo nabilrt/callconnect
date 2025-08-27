@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Avatar from '../ui/Avatar';
 
 const CommentSection = ({ postId, comments, setComments, onComment }) => {
+  const navigate = useNavigate();
   const [newComment, setNewComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user, token } = useAuth();
@@ -74,6 +76,10 @@ const CommentSection = ({ postId, comments, setComments, onComment }) => {
     }
   };
 
+  const handleUsernameClick = (userId) => {
+    navigate(`/profile/${userId}`);
+  };
+
   return (
     <div className="px-4 pb-4">
       {/* Existing Comments */}
@@ -89,7 +95,10 @@ const CommentSection = ({ postId, comments, setComments, onComment }) => {
               <div className="flex-1">
                 <div className="bg-gray-100 rounded-2xl px-3 py-2">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-semibold text-sm text-gray-900">
+                    <span 
+                      className="font-semibold text-sm text-gray-900 hover:underline cursor-pointer"
+                      onClick={() => handleUsernameClick(comment.user_id)}
+                    >
                       {comment.username}
                     </span>
                     {comment.user_id === user?.id && (

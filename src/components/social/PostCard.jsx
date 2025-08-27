@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Avatar from '../ui/Avatar';
 import CommentSection from './CommentSection';
@@ -7,6 +8,7 @@ import SharedPostCard from './SharedPostCard';
 import ConfirmationModal from '../ui/ConfirmationModal';
 
 const PostCard = ({ post, onLike, onComment, onDelete }) => {
+  const navigate = useNavigate();
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState([]);
   const [isLiking, setIsLiking] = useState(false);
@@ -67,6 +69,10 @@ const PostCard = ({ post, onLike, onComment, onDelete }) => {
       console.error('Error deleting post:', error);
     }
     setShowMenu(false);
+  };
+
+  const handleUsernameClick = () => {
+    navigate(`/profile/${post.author_id}`);
   };
 
   const fetchComments = async () => {
@@ -150,7 +156,10 @@ const PostCard = ({ post, onLike, onComment, onDelete }) => {
             />
             <div>
               <div className="flex items-center space-x-2">
-                <h3 className="font-semibold text-gray-900 hover:underline cursor-pointer">
+                <h3 
+                  className="font-semibold text-gray-900 hover:underline cursor-pointer"
+                  onClick={handleUsernameClick}
+                >
                   {post.username}
                 </h3>
                 {getPrivacyIcon(post.privacy)}

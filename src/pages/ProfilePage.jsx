@@ -1,19 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/ui/Avatar';
 import PostCard from '../components/social/PostCard';
 import CreatePost from '../components/social/CreatePost';
 import EditProfileModal from '../components/social/EditProfileModal';
+import ChatWindow from '../components/chat/ChatWindow';
+import FeedbackModal from '../components/ui/FeedbackModal';
 
 const ProfilePage = () => {
   const { userId } = useParams();
+  const navigate = useNavigate();
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showChatModal, setShowChatModal] = useState(false);
   const [friendshipStatus, setFriendshipStatus] = useState(null);
   const [sendingRequest, setSendingRequest] = useState(false);
+  const [modal, setModal] = useState({ isOpen: false, type: '', title: '', message: '' });
   const { user, token, socket, updateAvatar } = useAuth();
 
   const isOwnProfile = !userId || parseInt(userId) === user?.id;
@@ -84,75 +89,21 @@ const ProfilePage = () => {
 
   const checkFriendshipStatus = async () => {
     try {
-      // First try to get friend status from the friends list
-      try {
-        const friendsResponse = await fetch('http://localhost:3001/api/auth/friends', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (friendsResponse.ok) {
-          const friends = await friendsResponse.json();
-          const isFriend = friends.some(friend => friend.id === parseInt(targetUserId));
-          
-          if (isFriend) {
-            setFriendshipStatus({ status: 'friends' });
-            return;
-          }
-        }
-      } catch (friendsError) {
-        console.log('Could not fetch friends list');
-      }
+      const response = await fetch(`http://localhost:3001/api/auth/friendship-status/${targetUserId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-      // Try to get friend requests to check if there's a pending request
-      try {
-        const sentRequestsResponse = await fetch('http://localhost:3001/api/auth/friend-requests?type=sent', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (sentRequestsResponse.ok) {
-          const sentRequests = await sentRequestsResponse.json();
-          const hasSentRequest = sentRequests.some(req => req.receiver_id === parseInt(targetUserId));
-          
-          if (hasSentRequest) {
-            setFriendshipStatus({ status: 'pending_sent' });
-            return;
-          }
-        }
-      } catch (sentError) {
-        console.log('Could not fetch sent requests');
+      if (response.ok) {
+        const result = await response.json();
+        setFriendshipStatus({ status: result.status });
+      } else {
+        console.error('Failed to fetch friendship status');
+        setFriendshipStatus({ status: 'none' });
       }
-
-      // Try to get received requests
-      try {
-        const receivedRequestsResponse = await fetch('http://localhost:3001/api/auth/friend-requests?type=received', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
-        });
-        
-        if (receivedRequestsResponse.ok) {
-          const receivedRequests = await receivedRequestsResponse.json();
-          const hasReceivedRequest = receivedRequests.some(req => req.sender_id === parseInt(targetUserId));
-          
-          if (hasReceivedRequest) {
-            setFriendshipStatus({ status: 'pending_received' });
-            return;
-          }
-        }
-      } catch (receivedError) {
-        console.log('Could not fetch received requests');
-      }
-
-      // Default to no friendship
-      setFriendshipStatus({ status: 'none' });
-      
     } catch (error) {
       console.error('Error checking friendship status:', error);
-      // Default to no friendship on error
       setFriendshipStatus({ status: 'none' });
     }
   };
@@ -172,16 +123,36 @@ const ProfilePage = () => {
 
       if (response.ok) {
         setFriendshipStatus({ status: 'pending_sent' });
+        setModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Friend Request Sent!',
+          message: 'Your friend request has been sent successfully.'
+        });
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Failed to send friend request' }));
-        alert(errorData.error || 'Failed to send friend request. Please try again.');
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Failed to Send Request',
+          message: errorData.error || 'Failed to send friend request. Please try again.'
+        });
       }
     } catch (error) {
-      console.error('Error sending friend request:', error);
       if (error.message === 'Failed to fetch') {
-        alert('Cannot connect to server. Please check your internet connection and try again.');
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Connection Error',
+          message: 'Cannot connect to server. Please check your internet connection and try again.'
+        });
       } else {
-        alert('Failed to send friend request. Please try again.');
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Request Failed',
+          message: 'Failed to send friend request. Please try again.'
+        });
       }
     } finally {
       setSendingRequest(false);
@@ -232,10 +203,35 @@ const ProfilePage = () => {
 
       if (response.ok) {
         setFriendshipStatus({ status: 'none' });
+        setModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Friend Removed',
+          message: 'Friend has been removed from your friends list.'
+        });
+      } else {
+        const errorData = await response.json().catch(() => ({ error: 'Failed to remove friend' }));
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Failed to Remove Friend',
+          message: errorData.error || 'Failed to remove friend. Please try again.'
+        });
       }
     } catch (error) {
       console.error('Error removing friend:', error);
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Error',
+        message: 'Failed to remove friend. Please try again.'
+      });
     }
+  };
+
+  const handleMessageClick = () => {
+    // Open chat modal with the selected user
+    setShowChatModal(true);
   };
 
   const handleCoverPhotoChange = async (event) => {
@@ -382,12 +378,11 @@ const ProfilePage = () => {
     );
   }
 
-  // Privacy logic
-  const canViewPosts = isOwnProfile || 
-    profile.privacy_setting === 'public' || 
-    (profile.privacy_setting === 'friends' && friendshipStatus?.status === 'friends');
+  // Privacy logic - make posts visible by default as requested by user
+  const canViewPosts = true; // Allow everyone to see posts
 
   const canViewFullProfile = isOwnProfile || 
+    !profile.privacy_setting || 
     profile.privacy_setting === 'public' || 
     (profile.privacy_setting === 'friends' && friendshipStatus?.status === 'friends');
 
@@ -531,7 +526,10 @@ const ProfilePage = () => {
                       <div className="flex space-x-3">
                         {renderFriendButton()}
                         {friendshipStatus?.status === 'friends' && (
-                          <button className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm">
+                          <button 
+                            onClick={handleMessageClick}
+                            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                          >
                             Message
                           </button>
                         )}
@@ -644,6 +642,26 @@ const ProfilePage = () => {
           onUpdate={setProfile}
         />
       )}
+
+      {/* Chat Modal */}
+      {showChatModal && profile && (
+        <ChatWindow
+          friend={{
+            id: parseInt(targetUserId),
+            username: profile.username,
+            avatar: profile.avatar
+          }}
+          onClose={() => setShowChatModal(false)}
+        />
+      )}
+
+      <FeedbackModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({ ...modal, isOpen: false })}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+      />
     </div>
   );
 };

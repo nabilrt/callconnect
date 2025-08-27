@@ -300,6 +300,9 @@ const initializeDatabase = () => {
             if (!columnNames.includes('birth_date')) {
               db.run(`ALTER TABLE users ADD COLUMN birth_date DATE DEFAULT NULL`);
             }
+            if (!columnNames.includes('privacy_setting')) {
+              db.run(`ALTER TABLE users ADD COLUMN privacy_setting TEXT DEFAULT 'public' CHECK(privacy_setting IN ('public', 'friends', 'private'))`);
+            }
           }
         });
       }
@@ -355,11 +358,44 @@ const getUserFriends = (userId, callback) => {
 };
 
 const sendFriendRequest = (senderId, receiverId, callback) => {
-  const query = `INSERT OR IGNORE INTO friend_requests (sender_id, receiver_id) VALUES (?, ?)`;
-  db.run(query, [senderId, receiverId], callback);
+  console.log('🔄 Database: Attempting to insert friend request');
+  console.log('🔄 Database: Sender ID:', senderId, 'Receiver ID:', receiverId);
+  
+  // First, delete any existing friend requests between these users
+  const deleteQuery = `DELETE FROM friend_requests WHERE 
+    (sender_id = ? AND receiver_id = ?) OR 
+    (sender_id = ? AND receiver_id = ?)`;
+    
+  db.run(deleteQuery, [senderId, receiverId, receiverId, senderId], function(deleteErr) {
+    if (deleteErr) {
+      console.error('❌ Database: Error deleting existing requests:', deleteErr);
+      return callback(deleteErr);
+    }
+    
+    console.log('🔄 Database: Deleted existing requests, changes:', this.changes);
+    
+    // Now insert the new friend request
+    const insertQuery = `INSERT INTO friend_requests (sender_id, receiver_id, status) VALUES (?, ?, 'pending')`;
+    db.run(insertQuery, [senderId, receiverId], function(insertErr) {
+      if (insertErr) {
+        console.error('❌ Database: Error inserting friend request:', insertErr);
+      } else {
+        console.log('✅ Database: Friend request inserted, changes:', this.changes, 'lastID:', this.lastID);
+      }
+      callback(insertErr);
+    });
+  });
 };
 
 const getFriendRequests = (userId, type = 'received', callback) => {
+  console.log('🔄 Database: Getting friend requests');
+  console.log('🔄 Database: User ID:', userId, 'Type:', type);
+  
+  // First, let's check if there are any friend requests at all for debugging
+  db.all('SELECT * FROM friend_requests WHERE receiver_id = ? OR sender_id = ?', [userId, userId], (debugErr, debugRows) => {
+    console.log('🔍 Database: All friend requests for user', userId, ':', debugRows);
+  });
+  
   let query;
   if (type === 'received') {
     query = `
@@ -367,7 +403,7 @@ const getFriendRequests = (userId, type = 'received', callback) => {
              u.id as user_id, u.username, u.email, u.avatar 
       FROM friend_requests fr
       JOIN users u ON fr.sender_id = u.id
-      WHERE fr.receiver_id = ? AND fr.status = 'pending'
+      WHERE fr.receiver_id = ? AND (fr.status = 'pending' OR fr.status IS NULL)
       ORDER BY fr.created_at DESC
     `;
   } else {
@@ -376,43 +412,77 @@ const getFriendRequests = (userId, type = 'received', callback) => {
              u.id as user_id, u.username, u.email, u.avatar 
       FROM friend_requests fr
       JOIN users u ON fr.receiver_id = u.id
-      WHERE fr.sender_id = ? AND fr.status = 'pending'
+      WHERE fr.sender_id = ? AND (fr.status = 'pending' OR fr.status IS NULL)
       ORDER BY fr.created_at DESC
     `;
   }
-  db.all(query, [userId], callback);
+  
+  console.log('🔄 Database: Executing query:', query);
+  console.log('🔄 Database: Query params:', [userId]);
+  
+  db.all(query, [userId], function(err, rows) {
+    if (err) {
+      console.error('❌ Database: Error executing query:', err);
+    } else {
+      console.log('✅ Database: Query executed, found rows:', rows.length);
+      console.log('✅ Database: Rows data:', rows);
+    }
+    callback(err, rows);
+  });
 };
 
 const respondToFriendRequest = (requestId, status, callback) => {
+  console.log('🔄 Database: Responding to friend request:', requestId, 'with status:', status);
+  
   db.serialize(() => {
     db.get(`SELECT * FROM friend_requests WHERE id = ?`, [requestId], (err, request) => {
       if (err || !request) {
+        console.error('❌ Database: Request not found:', err);
         return callback(err || new Error('Request not found'));
       }
 
-      const now = new Date().toISOString();
-      db.run(
-        `UPDATE friend_requests SET status = ?, updated_at = ? WHERE id = ?`,
-        [status, now, requestId],
-        function(updateErr) {
-          if (updateErr) {
-            return callback(updateErr);
-          }
+      console.log('🔄 Database: Found request:', request);
 
-          if (status === 'accepted') {
-            const user1Id = Math.min(request.sender_id, request.receiver_id);
-            const user2Id = Math.max(request.sender_id, request.receiver_id);
+      if (status === 'accepted') {
+        const user1Id = Math.min(request.sender_id, request.receiver_id);
+        const user2Id = Math.max(request.sender_id, request.receiver_id);
+        
+        console.log('🔄 Database: Creating friendship between:', user1Id, 'and', user2Id);
+        
+        db.run(
+          `INSERT OR IGNORE INTO friendships (user1_id, user2_id) VALUES (?, ?)`,
+          [user1Id, user2Id],
+          function(friendshipErr) {
+            if (friendshipErr) {
+              console.error('❌ Database: Error creating friendship:', friendshipErr);
+              return callback(friendshipErr);
+            }
             
-            db.run(
-              `INSERT OR IGNORE INTO friendships (user1_id, user2_id) VALUES (?, ?)`,
-              [user1Id, user2Id],
-              callback
-            );
-          } else {
-            callback(null);
+            console.log('✅ Database: Friendship created, changes:', this.changes);
+            
+            // Delete the friend request after accepting
+            db.run(`DELETE FROM friend_requests WHERE id = ?`, [requestId], function(deleteErr) {
+              if (deleteErr) {
+                console.error('❌ Database: Error deleting accepted request:', deleteErr);
+              } else {
+                console.log('✅ Database: Deleted accepted friend request, changes:', this.changes);
+              }
+              callback(deleteErr);
+            });
           }
-        }
-      );
+        );
+      } else {
+        // For rejected requests, just delete the request
+        console.log('🔄 Database: Deleting rejected friend request');
+        db.run(`DELETE FROM friend_requests WHERE id = ?`, [requestId], function(deleteErr) {
+          if (deleteErr) {
+            console.error('❌ Database: Error deleting rejected request:', deleteErr);
+          } else {
+            console.log('✅ Database: Deleted rejected friend request, changes:', this.changes);
+          }
+          callback(deleteErr);
+        });
+      }
     });
   });
 };
@@ -534,7 +604,7 @@ const getPosts = (userId, limit = 20, callback) => {
            (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked,
            sp.id as shared_id, sp.content as shared_content, sp.image as shared_image, 
            sp.video as shared_video, sp.post_type as shared_post_type,
-           su.username as shared_username, su.avatar as shared_avatar
+           su.username as shared_username, su.avatar as shared_avatar, su.id as shared_user_id
     FROM posts p
     JOIN users u ON p.user_id = u.id
     LEFT JOIN posts sp ON p.shared_post_id = sp.id
@@ -552,20 +622,20 @@ const getPosts = (userId, limit = 20, callback) => {
 
 const getUserPosts = (userId, viewerId, callback) => {
   const query = `
-    SELECT p.*, u.username, u.avatar, u.id as author_id,
+    SELECT p.*, u.username, u.avatar, u.id as author_id, u.privacy_setting,
            p.likes_count,
            (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked,
            sp.id as shared_id, sp.content as shared_content, sp.image as shared_image, 
            sp.video as shared_video, sp.post_type as shared_post_type,
-           su.username as shared_username, su.avatar as shared_avatar
+           su.username as shared_username, su.avatar as shared_avatar, su.id as shared_user_id
     FROM posts p
     JOIN users u ON p.user_id = u.id
     LEFT JOIN posts sp ON p.shared_post_id = sp.id
     LEFT JOIN users su ON sp.user_id = su.id
-    WHERE p.user_id = ? AND (p.privacy != 'private' OR p.user_id = ?)
+    WHERE p.user_id = ? AND p.privacy != 'private'
     ORDER BY p.created_at DESC
   `;
-  db.all(query, [viewerId, userId, viewerId], callback);
+  db.all(query, [viewerId, userId], callback);
 };
 
 const getPost = (postId, userId, callback) => {
@@ -575,7 +645,7 @@ const getPost = (postId, userId, callback) => {
            (SELECT COUNT(*) FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = ?) as user_liked,
            sp.id as shared_id, sp.content as shared_content, sp.image as shared_image, 
            sp.video as shared_video, sp.post_type as shared_post_type,
-           su.username as shared_username, su.avatar as shared_avatar
+           su.username as shared_username, su.avatar as shared_avatar, su.id as shared_user_id
     FROM posts p
     JOIN users u ON p.user_id = u.id
     LEFT JOIN posts sp ON p.shared_post_id = sp.id

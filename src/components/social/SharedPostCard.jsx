@@ -1,7 +1,10 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import Avatar from '../ui/Avatar';
 
 const SharedPostCard = ({ sharedPost }) => {
+  const navigate = useNavigate();
+  
   if (!sharedPost) return null;
 
   const renderSharedMedia = () => {
@@ -35,6 +38,14 @@ const SharedPostCard = ({ sharedPost }) => {
     return null;
   };
 
+  const handleUsernameClick = () => {
+    // We need to get the user ID somehow - this might need to be passed as a prop
+    // For now, let's assume it's available in the sharedPost data
+    if (sharedPost.shared_user_id) {
+      navigate(`/profile/${sharedPost.shared_user_id}`);
+    }
+  };
+
   // Show debug info temporarily
   if (!sharedPost.shared_username && !sharedPost.shared_content) {
     return (
@@ -53,7 +64,12 @@ const SharedPostCard = ({ sharedPost }) => {
           size="sm"
         />
         <div>
-          <div className="font-semibold text-gray-900 text-sm">{sharedPost.shared_username}</div>
+          <div 
+            className="font-semibold text-gray-900 text-sm hover:underline cursor-pointer"
+            onClick={handleUsernameClick}
+          >
+            {sharedPost.shared_username}
+          </div>
         </div>
       </div>
       

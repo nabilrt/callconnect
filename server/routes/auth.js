@@ -235,18 +235,28 @@ router.get('/friends', authenticateToken, (req, res) => {
 router.post('/friend-request', authenticateToken, (req, res) => {
   const { receiverId } = req.body;
   
+  console.log('🔄 Backend: Friend request received');
+  console.log('🔄 Backend: Sender ID:', req.user.userId);
+  console.log('🔄 Backend: Receiver ID:', receiverId);
+  console.log('🔄 Backend: Sender username:', req.user.username);
+  
   if (!receiverId) {
+    console.log('❌ Backend: Receiver ID is missing');
     return res.status(400).json({ error: 'Receiver ID is required' });
   }
 
   if (receiverId === req.user.userId) {
+    console.log('❌ Backend: User trying to send request to themselves');
     return res.status(400).json({ error: 'Cannot send friend request to yourself' });
   }
 
   sendFriendRequest(req.user.userId, receiverId, (err) => {
     if (err) {
+      console.error('❌ Backend: Database error:', err);
       return res.status(500).json({ error: 'Error sending friend request' });
     }
+    
+    console.log('✅ Backend: Friend request saved to database');
 
     // Create notification for the receiver
     const notificationData = {
@@ -262,10 +272,13 @@ router.post('/friend-request', authenticateToken, (req, res) => {
 
     createNotification(notificationData, (notifyErr) => {
       if (notifyErr) {
-        console.error('Error creating notification:', notifyErr);
+        console.error('❌ Backend: Error creating notification:', notifyErr);
+      } else {
+        console.log('✅ Backend: Notification created successfully');
       }
     });
 
+    console.log('✅ Backend: Sending success response');
     res.json({ message: 'Friend request sent successfully' });
   });
 });
@@ -273,10 +286,17 @@ router.post('/friend-request', authenticateToken, (req, res) => {
 router.get('/friend-requests', authenticateToken, (req, res) => {
   const type = req.query.type || 'received';
   
+  console.log('🔄 Backend: Getting friend requests');
+  console.log('🔄 Backend: User ID:', req.user.userId);
+  console.log('🔄 Backend: Request type:', type);
+  
   getFriendRequests(req.user.userId, type, (err, requests) => {
     if (err) {
+      console.error('❌ Backend: Database error getting friend requests:', err);
       return res.status(500).json({ error: 'Database error' });
     }
+    console.log('✅ Backend: Friend requests found:', requests.length);
+    console.log('✅ Backend: Friend requests data:', requests);
     res.json(requests);
   });
 });
@@ -343,6 +363,55 @@ router.delete('/friends/:friendId', authenticateToken, (req, res) => {
       return res.status(500).json({ error: 'Error removing friend' });
     }
     res.json({ message: 'Friend removed successfully' });
+  });
+});
+
+// Get friendship status with another user
+router.get('/friendship-status/:userId', authenticateToken, (req, res) => {
+  const { userId } = req.params;
+  const currentUserId = req.user.userId;
+  
+  if (parseInt(userId) === currentUserId) {
+    return res.json({ status: 'self' });
+  }
+  
+  // Check if they are already friends
+  getUserFriends(currentUserId, (err, friends) => {
+    if (err) {
+      return res.status(500).json({ error: 'Database error' });
+    }
+    
+    const isFriend = friends.some(friend => friend.id === parseInt(userId));
+    if (isFriend) {
+      return res.json({ status: 'friends' });
+    }
+    
+    // Check if there's a pending request (sent)
+    getFriendRequests(currentUserId, 'sent', (err, sentRequests) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      
+      const hasSentRequest = sentRequests.some(req => req.receiver_id === parseInt(userId));
+      if (hasSentRequest) {
+        return res.json({ status: 'pending_sent' });
+      }
+      
+      // Check if there's a pending request (received)
+      getFriendRequests(currentUserId, 'received', (err, receivedRequests) => {
+        if (err) {
+          return res.status(500).json({ error: 'Database error' });
+        }
+        
+        const hasReceivedRequest = receivedRequests.some(req => req.sender_id === parseInt(userId));
+        if (hasReceivedRequest) {
+          return res.json({ status: 'pending_received' });
+        }
+        
+        // No relationship
+        return res.json({ status: 'none' });
+      });
+    });
   });
 });
 

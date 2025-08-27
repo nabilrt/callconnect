@@ -1,14 +1,18 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import Avatar from '../ui/Avatar';
+import FeedbackModal from '../ui/FeedbackModal';
 
 const FriendDiscovery = () => {
+  const navigate = useNavigate();
   const [suggestedFriends, setSuggestedFriends] = useState([]);
   const [loading, setLoading] = useState(true);
   const [sendingRequests, setSendingRequests] = useState(new Set());
   const [sentRequests, setSentRequests] = useState(new Set());
   const [receivedRequests, setReceivedRequests] = useState(new Set());
   const [friendsSet, setFriendsSet] = useState(new Set());
+  const [modal, setModal] = useState({ isOpen: false, type: '', title: '', message: '' });
   const { token, user } = useAuth();
 
   useEffect(() => {
@@ -89,18 +93,36 @@ const FriendDiscovery = () => {
       if (response.ok) {
         // Mark the user as having a sent request
         setSentRequests(prev => new Set(prev).add(friendId));
+        setModal({
+          isOpen: true,
+          type: 'success',
+          title: 'Friend Request Sent!',
+          message: 'Your friend request has been sent successfully.'
+        });
       } else {
-        console.error('Friend request API responded with:', response.status);
-        // Show user feedback for failed request
-        alert('Failed to send friend request. Please try again.');
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Failed to Send Request',
+          message: errorData.error || 'Failed to send friend request. Please try again.'
+        });
       }
     } catch (error) {
-      console.error('Error sending friend request:', error);
-      // Check if it's a connection error
       if (error.message === 'Failed to fetch') {
-        alert('Cannot connect to server. Please check your internet connection and try again.');
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Connection Error',
+          message: 'Cannot connect to server. Please check your internet connection and try again.'
+        });
       } else {
-        alert('Failed to send friend request. Please try again.');
+        setModal({
+          isOpen: true,
+          type: 'error',
+          title: 'Request Failed',
+          message: 'Failed to send friend request. Please try again.'
+        });
       }
     } finally {
       setSendingRequests(prev => {
@@ -173,16 +195,43 @@ const FriendDiscovery = () => {
             
             if (status === 'accepted') {
               setFriendsSet(prev => new Set(prev).add(senderId));
+              setModal({
+                isOpen: true,
+                type: 'success',
+                title: 'Friend Request Accepted!',
+                message: 'You are now friends!'
+              });
+            } else {
+              setModal({
+                isOpen: true,
+                type: 'info',
+                title: 'Friend Request Rejected',
+                message: 'Friend request has been rejected.'
+              });
             }
           } else {
-            alert(`Failed to ${status === 'accepted' ? 'accept' : 'reject'} friend request.`);
+            setModal({
+              isOpen: true,
+              type: 'error',
+              title: 'Action Failed',
+              message: `Failed to ${status === 'accepted' ? 'accept' : 'reject'} friend request.`
+            });
           }
         }
       }
     } catch (error) {
       console.error('Error responding to friend request:', error);
-      alert('Failed to respond to friend request. Please try again.');
+      setModal({
+        isOpen: true,
+        type: 'error',
+        title: 'Request Failed',
+        message: 'Failed to respond to friend request. Please try again.'
+      });
     }
+  };
+
+  const handleUsernameClick = (userId) => {
+    navigate(`/profile/${userId}`);
   };
 
   const getButtonForUser = (friend) => {
@@ -267,7 +316,12 @@ const FriendDiscovery = () => {
                   size="sm"
                 />
                 <div>
-                  <p className="font-medium text-gray-900 text-sm">{friend.username}</p>
+                  <p 
+                    className="font-medium text-gray-900 text-sm hover:underline cursor-pointer"
+                    onClick={() => handleUsernameClick(friend.id)}
+                  >
+                    {friend.username}
+                  </p>
                   <p className="text-xs text-gray-500">
                     {friend.mutualFriends > 0 ? `${friend.mutualFriends} mutual friends` : 'New to SocialHub'}
                   </p>
@@ -291,6 +345,14 @@ const FriendDiscovery = () => {
           <p className="text-sm text-gray-500">No friend suggestions available</p>
         </div>
       )}
+
+      <FeedbackModal
+        isOpen={modal.isOpen}
+        onClose={() => setModal({ ...modal, isOpen: false })}
+        type={modal.type}
+        title={modal.title}
+        message={modal.message}
+      />
     </div>
   );
 };
