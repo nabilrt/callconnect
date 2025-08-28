@@ -4,6 +4,7 @@ import Navigation from '../components/layout/Navigation';
 import PageTransition from '../components/layout/PageTransition';
 import Profile from '../components/dashboard/Profile';
 import ContactsList from '../components/dashboard/ContactsList';
+import CallManager from '../components/calling/CallManager';
 import FeedPage from './FeedPage';
 import ProfilePage from './ProfilePage';
 import FriendsPage from './FriendsPage';
@@ -52,6 +53,9 @@ const DashboardPage = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Top Navigation */}
       <Navigation />
+
+      {/* Call Manager - Global calling functionality */}
+      <CallManager />
 
       {/* Main Content Area */}
       <div className="pt-16">

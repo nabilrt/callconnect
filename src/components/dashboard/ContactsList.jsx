@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { Phone, Video } from 'lucide-react';
 import Avatar from '../ui/Avatar';
 import Button from '../ui/Button';
 
@@ -45,6 +46,15 @@ const ContactsList = () => {
     if (!user) return 'Offline';
     
     return user.status === 'online' ? 'Online' : 'Offline';
+  };
+
+  const handleStartCall = (receiverId, receiverUsername, callType = 'audio') => {
+    if (typeof window.startCall === 'function') {
+      window.startCall(receiverId, receiverUsername, callType);
+    } else {
+      console.error('Call function not available');
+      alert('Calling feature is not available at the moment.');
+    }
   };
 
   if (loading) {
@@ -98,8 +108,35 @@ const ContactsList = () => {
                 </p>
               </div>
               
-              {/* Message Button */}
+              {/* Action Buttons */}
               <div className="flex items-center space-x-2">
+                {/* Audio Call Button */}
+                {onlineUsers.has(user.id) && getStatusText(user.id) === 'Online' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full p-2 text-green-600 hover:text-green-700 hover:bg-green-50"
+                    onClick={() => handleStartCall(user.id, user.username, 'audio')}
+                    title="Start audio call"
+                  >
+                    <Phone size={16} />
+                  </Button>
+                )}
+
+                {/* Video Call Button */}
+                {onlineUsers.has(user.id) && getStatusText(user.id) === 'Online' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="rounded-full p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                    onClick={() => handleStartCall(user.id, user.username, 'video')}
+                    title="Start video call"
+                  >
+                    <Video size={16} />
+                  </Button>
+                )}
+                
+                {/* Message Button */}
                 <Button
                   variant="ghost"
                   size="sm"
