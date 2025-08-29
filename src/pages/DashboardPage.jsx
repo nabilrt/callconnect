@@ -5,6 +5,7 @@ import PageTransition from '../components/layout/PageTransition';
 import Profile from '../components/dashboard/Profile';
 import ContactsList from '../components/dashboard/ContactsList';
 import CallManager from '../components/calling/CallManager';
+import CallHistory from '../components/calling/CallHistory';
 import FeedPage from './FeedPage';
 import ProfilePage from './ProfilePage';
 import FriendsPage from './FriendsPage';
@@ -36,6 +37,7 @@ const DashboardPage = () => {
       '/friends': 'Friends - SocialHub',
       '/groups': 'Groups - SocialHub',
       '/messages': 'Messages - SocialHub',
+      '/call-history': 'Call History - SocialHub',
       '/admin': 'Admin Panel - SocialHub'
     };
     
@@ -68,6 +70,7 @@ const DashboardPage = () => {
           <Route path="/groups" element={<PageTransition><GroupsPage /></PageTransition>} />
           <Route path="/groups/:groupId" element={<PageTransition><GroupDetailPage /></PageTransition>} />
           <Route path="/messages" element={<PageTransition><MessagesPage /></PageTransition>} />
+          <Route path="/call-history" element={<PageTransition><CallHistory /></PageTransition>} />
           <Route path="/" element={<PageTransition><FeedPage /></PageTransition>} />
         </Routes>
       </div>

@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import Avatar from '../ui/Avatar';
 import webrtcService from '../../services/webrtcService';
+import callHistoryService from '../../services/callHistoryService';
+import { useAuth } from '../../context/AuthContext';
 
 const CallWindow = ({ 
   isOpen, 
@@ -18,6 +20,7 @@ const CallWindow = ({
   onEndCall,
   onMinimize 
 }) => {
+  const { user } = useAuth();
   const [isMinimized, setIsMinimized] = useState(false);
   const [isAudioMuted, setIsAudioMuted] = useState(false);
   const [isVideoMuted, setIsVideoMuted] = useState(false);
@@ -30,7 +33,8 @@ const CallWindow = ({
   const remoteAudioRef = useRef(null);
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
-  const callStartTime = useRef(Date.now());
+  const callStartTime = useRef(null);
+  const timerRef = useRef(null);
 
   useEffect(() => {
     if (!isOpen || !callData) return;
@@ -39,15 +43,22 @@ const CallWindow = ({
     const handleLocalStream = (event) => {
       const stream = event.detail.stream;
       const hasVideo = event.detail.hasVideo;
+      const streamCallType = event.detail.callType;
       
-      console.log('🎥 CallWindow: Local stream received', {
-        hasVideo,
-        videoTracks: stream?.getVideoTracks().length,
-        audioTracks: stream?.getAudioTracks().length,
-        stream
+      console.log('🎥 CallWindow: Local stream event received - DETAILED:', {
+        'event.detail': event.detail,
+        'hasVideo (from event)': hasVideo,
+        'hasVideo type': typeof hasVideo,
+        'streamCallType': streamCallType,
+        'callDataType': callData?.callType,
+        'videoTracks length': stream?.getVideoTracks().length,
+        'audioTracks length': stream?.getAudioTracks().length,
+        'stream object': stream
       });
       
-      setHasLocalVideo(hasVideo);
+      // Use hasVideo OR if it's a video call type as fallback
+      const shouldShowVideo = hasVideo || streamCallType === 'video' || callData?.callType === 'video';
+      setHasLocalVideo(shouldShowVideo);
       
       if (stream) {
         // Set up audio
@@ -56,9 +67,9 @@ const CallWindow = ({
           console.log('🎵 Set local audio stream');
         }
         
-        // Set up video if available
-        if (hasVideo && localVideoRef.current) {
-          console.log('🎥 Setting local video stream to video element');
+        // Set up video if available - always try to set for video calls
+        if (localVideoRef.current && (hasVideo || callData?.callType === 'video')) {
+          console.log('🎥 Setting local video stream to video element, hasVideo:', hasVideo, 'callType:', callData?.callType);
           localVideoRef.current.srcObject = stream;
           localVideoRef.current.play().catch(error => {
             console.error('🎥 Error playing local video:', error);
@@ -100,7 +111,14 @@ const CallWindow = ({
     };
 
     const handleConnectionState = (event) => {
-      setConnectionState(event.detail.state);
+      const newState = event.detail.state;
+      setConnectionState(newState);
+      
+      // Start timer when call is connected
+      if (newState === 'connected' && !callStartTime.current) {
+        callStartTime.current = Date.now();
+        console.log('📞 Call connected, starting duration timer');
+      }
     };
 
     const handleAudioToggled = (event) => {
@@ -112,6 +130,22 @@ const CallWindow = ({
     };
 
     const handleCallEnded = () => {
+      // Calculate final call duration
+      const finalDuration = callStartTime.current ? 
+        Math.floor((Date.now() - callStartTime.current) / 1000) : 0;
+      
+      // Always save completed calls (duration > 0)
+      // Don't save calls that never connected (duration = 0) as they're handled elsewhere as missed calls
+      if (finalDuration > 0) {
+        console.log('📞 Saving completed call with duration:', finalDuration);
+        saveCallToHistory(finalDuration);
+      }
+      
+      // Stop timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      
       // Reset all state
       setConnectionState('closed');
       setIsAudioMuted(false);
@@ -119,6 +153,7 @@ const CallWindow = ({
       setHasLocalVideo(false);
       setHasRemoteVideo(false);
       setCallDuration(0);
+      callStartTime.current = null;
       
       // Clear audio and video elements
       if (localAudioRef.current) {
@@ -139,6 +174,15 @@ const CallWindow = ({
 
     const handleCleanup = () => {
       console.log('🧹 Call window cleanup triggered');
+      
+      // Don't save call history on cleanup - this is handled by handleCallEnded
+      // Cleanup is for forced cleanup scenarios (like browser refresh)
+      
+      // Stop timer
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+      
       // Reset all local state
       setConnectionState('closed');
       setIsAudioMuted(false);
@@ -146,6 +190,7 @@ const CallWindow = ({
       setHasLocalVideo(false);
       setHasRemoteVideo(false);
       setCallDuration(0);
+      callStartTime.current = null;
       
       // Clear audio and video elements
       if (localAudioRef.current) {
@@ -171,9 +216,11 @@ const CallWindow = ({
     window.addEventListener('webrtc:callEnded', handleCallEnded);
     window.addEventListener('webrtc:cleanup', handleCleanup);
 
-    // Start call duration timer
-    const timer = setInterval(() => {
-      setCallDuration(Math.floor((Date.now() - callStartTime.current) / 1000));
+    // Start call duration timer (only when connected)
+    timerRef.current = setInterval(() => {
+      if (callStartTime.current) {
+        setCallDuration(Math.floor((Date.now() - callStartTime.current) / 1000));
+      }
     }, 1000);
 
     return () => {
@@ -186,9 +233,32 @@ const CallWindow = ({
       window.removeEventListener('webrtc:callEnded', handleCallEnded);
       window.removeEventListener('webrtc:cleanup', handleCleanup);
       
-      clearInterval(timer);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
     };
   }, [isOpen, callData, onEndCall]);
+
+  const saveCallToHistory = async (duration) => {
+    if (!callData || !user) return;
+    
+    const callRecord = {
+      ...callData,
+      duration: duration,
+      status: duration > 0 ? 'completed' : 'missed',
+      startedAt: callStartTime.current ? new Date(callStartTime.current).toISOString() : new Date().toISOString(),
+      endedAt: new Date().toISOString()
+    };
+    
+    try {
+      // Transform to database format and save
+      const dbCallData = callHistoryService.transformToDbFormat(callRecord, user.id);
+      await callHistoryService.createCallHistory(dbCallData);
+    } catch (error) {
+      console.error('📞 Failed to save call to database, using localStorage fallback');
+      // The service already handles localStorage fallback in case of error
+    }
+  };
 
   const formatDuration = (seconds) => {
     const minutes = Math.floor(seconds / 60);
@@ -205,6 +275,15 @@ const CallWindow = ({
   };
 
   const handleEndCall = () => {
+    // Calculate call duration
+    const finalDuration = callStartTime.current ? 
+      Math.floor((Date.now() - callStartTime.current) / 1000) : 0;
+    
+    // Save call history regardless of duration
+    if (callData && user) {
+      saveCallToHistory(finalDuration);
+    }
+    
     webrtcService.endCall();
     onEndCall();
   };
@@ -223,12 +302,18 @@ const CallWindow = ({
     ? { username: callData.callerUsername, id: callData.callerId }
     : { username: callData.receiverUsername, id: callData.receiverId };
 
+  // For video calls, always show local video area
+  const showLocalVideoArea = callData.callType === 'video';
+  const showRemoteVideoArea = callData.callType === 'video';
+
   // Debug logging
   console.log('🎥 CallWindow render:', {
     hasLocalVideo,
     hasRemoteVideo,
     callType: callData.callType,
-    isVideoMuted
+    isVideoMuted,
+    showLocalVideoArea,
+    showRemoteVideoArea
   });
 
   return (
@@ -301,7 +386,7 @@ const CallWindow = ({
             </div>
 
             {/* Video Display Area - Always show for video calls */}
-            {callData.callType === 'video' && (
+            {showRemoteVideoArea && (
               <div className="flex-1 bg-gray-900 relative overflow-hidden">
                 {/* Remote Video (Main Display) - Always create the element */}
                 <video 
@@ -332,39 +417,6 @@ const CallWindow = ({
                   </div>
                 )}
                 
-                {/* Local Video (Picture-in-Picture) - Always show */}
-                <div className="absolute top-4 right-4 w-48 h-36 bg-gray-800 rounded-lg overflow-hidden border-2 border-gray-600 shadow-lg">
-                  {/* Always create the local video element */}
-                  <video 
-                    ref={localVideoRef}
-                    muted 
-                    autoPlay 
-                    playsInline
-                    className="w-full h-full object-cover"
-                    style={{ 
-                      display: 'block',
-                      transform: 'scaleX(-1)' // Mirror local video
-                    }}
-                    onLoadedMetadata={() => console.log('🎥 Local video metadata loaded')}
-                    onCanPlay={() => console.log('🎥 Local video can play')}
-                    onPlay={() => console.log('🎥 Local video started playing')}
-                  />
-                  
-                  {/* Overlay when video is muted */}
-                  {isVideoMuted && (
-                    <div className="absolute inset-0 bg-gray-900 flex items-center justify-center">
-                      <div className="text-center">
-                        <VideoOff className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-gray-400 text-xs">Camera off</p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Local video label */}
-                  <div className="absolute bottom-1 left-1 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
-                    You
-                  </div>
-                </div>
               </div>
             )}
 

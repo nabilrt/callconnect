@@ -55,6 +55,137 @@ const runMigrations = () => {
       }
     });
   });
+
+  // Check if call_history table exists and has the correct schema
+  db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='call_history'", (err, table) => {
+    if (err) {
+      console.log('Error checking call_history table:', err);
+      return;
+    }
+    
+    if (!table) {
+      console.log('📞 Creating call_history table...');
+      db.run(`CREATE TABLE call_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        caller_id INTEGER NOT NULL,
+        receiver_id INTEGER NOT NULL,
+        call_type TEXT NOT NULL CHECK(call_type IN ('audio', 'video')),
+        direction TEXT NOT NULL CHECK(direction IN ('incoming', 'outgoing')),
+        status TEXT NOT NULL CHECK(status IN ('completed', 'missed', 'rejected')),
+        duration INTEGER DEFAULT 0,
+        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        ended_at DATETIME DEFAULT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (caller_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+      )`, (err) => {
+        if (err) {
+          console.error('❌ Error creating call_history table:', err);
+        } else {
+          console.log('✅ Call history table created successfully.');
+        }
+      });
+    } else {
+      // Check if existing table has correct structure
+      console.log('✅ Call history table already exists. Checking schema...');
+      db.get("PRAGMA table_info(call_history)", (err, result) => {
+        if (err) {
+          console.log('Error checking call_history table schema:', err);
+          return;
+        }
+        
+        // Get all columns in the table
+        db.all("PRAGMA table_info(call_history)", (err, columns) => {
+          if (err) {
+            console.log('Error getting call_history columns:', err);
+            return;
+          }
+          
+          const columnNames = columns.map(col => col.name);
+          console.log('📞 Current call_history columns:', columnNames);
+          
+          // Check if we need to migrate the table
+          const hasReceiverIdColumn = columnNames.includes('receiver_id');
+          const hasDirectionColumn = columnNames.includes('direction');
+          const hasCreatedAtColumn = columnNames.includes('created_at');
+          const hasCalleeIdColumn = columnNames.includes('callee_id');
+          
+          if (!hasReceiverIdColumn || !hasDirectionColumn || !hasCreatedAtColumn || hasCalleeIdColumn) {
+            console.log('🔧 Call history table needs migration...');
+            
+            // Backup existing data
+            db.run(`CREATE TABLE call_history_backup AS SELECT * FROM call_history`, (backupErr) => {
+              if (backupErr) {
+                console.error('❌ Error creating backup:', backupErr);
+                return;
+              }
+              
+              // Drop the old table
+              db.run(`DROP TABLE call_history`, (dropErr) => {
+                if (dropErr) {
+                  console.error('❌ Error dropping old table:', dropErr);
+                  return;
+                }
+                
+                // Create new table with correct schema
+                db.run(`CREATE TABLE call_history (
+                  id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  caller_id INTEGER NOT NULL,
+                  receiver_id INTEGER NOT NULL,
+                  call_type TEXT NOT NULL CHECK(call_type IN ('audio', 'video')),
+                  direction TEXT NOT NULL CHECK(direction IN ('incoming', 'outgoing')),
+                  status TEXT NOT NULL CHECK(status IN ('completed', 'missed', 'rejected')),
+                  duration INTEGER DEFAULT 0,
+                  started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                  ended_at DATETIME DEFAULT NULL,
+                  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                  FOREIGN KEY (caller_id) REFERENCES users(id) ON DELETE CASCADE,
+                  FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+                )`, (createErr) => {
+                  if (createErr) {
+                    console.error('❌ Error creating new call_history table:', createErr);
+                    return;
+                  }
+                  
+                  // Migrate existing data if any
+                  db.get("SELECT COUNT(*) as count FROM call_history_backup", (countErr, countResult) => {
+                    if (countErr || !countResult || countResult.count === 0) {
+                      // No data to migrate, just clean up
+                      db.run(`DROP TABLE call_history_backup`);
+                      console.log('✅ Call history table migrated successfully (no data to migrate).');
+                      return;
+                    }
+                    
+                    // Migrate data from backup table
+                    console.log(`🔧 Migrating ${countResult.count} call history records...`);
+                    const migrateQuery = hasCalleeIdColumn ? 
+                      `INSERT INTO call_history (caller_id, receiver_id, call_type, direction, status, duration, started_at, ended_at, created_at)
+                       SELECT caller_id, callee_id, call_type, 'outgoing', status, duration, started_at, ended_at, started_at FROM call_history_backup` :
+                      `INSERT INTO call_history (caller_id, receiver_id, call_type, direction, status, duration, started_at, ended_at, created_at)
+                       SELECT caller_id, receiver_id, call_type, COALESCE(direction, 'outgoing'), status, duration, started_at, ended_at, COALESCE(created_at, started_at) FROM call_history_backup`;
+                    
+                    db.run(migrateQuery, (migrateErr) => {
+                      if (migrateErr) {
+                        console.error('❌ Error migrating data:', migrateErr);
+                      } else {
+                        console.log('✅ Call history data migrated successfully.');
+                      }
+                      
+                      // Clean up backup table
+                      db.run(`DROP TABLE call_history_backup`);
+                      console.log('✅ Call history table migration completed.');
+                    });
+                  });
+                });
+              });
+            });
+          } else {
+            console.log('✅ Call history table schema is correct.');
+          }
+        });
+      });
+    }
+  });
 };
 
 const initializeDatabase = () => {
@@ -253,6 +384,7 @@ const initializeDatabase = () => {
       UNIQUE(story_id, viewer_id)
     )`);
 
+
     // Group post likes table
     db.run(`CREATE TABLE IF NOT EXISTS group_post_likes (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -276,6 +408,7 @@ const initializeDatabase = () => {
       FOREIGN KEY (post_id) REFERENCES group_posts(id) ON DELETE CASCADE,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     )`);
+
 
     // Update users table to include social media profile fields
     // Check and add columns only if they don't exist
@@ -1261,6 +1394,182 @@ const deleteGroupPostComment = (commentId, userId, callback) => {
   });
 };
 
+// ==================== CALL HISTORY FUNCTIONS ====================
+
+const createCallHistory = (callData, callback) => {
+  const { caller_id, receiver_id, call_type, direction, status, duration, started_at, ended_at } = callData;
+  const now = new Date().toISOString();
+  
+  function proceedWithCallHistory() {
+      // Only check for duplicates of missed calls (to prevent spam missed calls)
+      // Allow multiple calls with different statuses (missed, completed, rejected)
+      if (status === 'missed') {
+        const recentMissedCallCheck = `
+          SELECT id FROM call_history 
+          WHERE caller_id = ? AND receiver_id = ? AND call_type = ? AND status = 'missed'
+          AND datetime(created_at) > datetime('now', '-10 seconds')
+          LIMIT 1
+        `;
+        
+        db.get(recentMissedCallCheck, [caller_id, receiver_id, call_type], (err, existingCall) => {
+          if (err) {
+            console.error('Error checking for duplicate missed calls:', err);
+            return callback(err);
+          }
+          
+          if (existingCall) {
+            console.log('📞 Duplicate missed call detected, skipping...');
+            return callback(null, { id: existingCall.id, duplicate: true });
+          }
+          
+          // No duplicate missed call found, create the call
+          insertCallHistory();
+        });
+      } else {
+        // For completed/rejected calls, always create the record
+        insertCallHistory();
+      }
+    }
+    
+    function insertCallHistory() {
+      const query = `
+        INSERT INTO call_history (caller_id, receiver_id, call_type, direction, status, duration, started_at, ended_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `;
+      
+      db.run(query, [caller_id, receiver_id, call_type, direction, status, duration, started_at, ended_at, now], function(err) {
+        if (callback) {
+          callback(err, {
+            id: this.lastID,
+            caller_id,
+            receiver_id,
+            call_type,
+            direction,
+            status,
+            duration,
+            started_at,
+            ended_at,
+            created_at: now
+          });
+        }
+      });
+    }
+  
+  // Ensure call_history table exists before proceeding
+  db.run(`CREATE TABLE IF NOT EXISTS call_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    caller_id INTEGER NOT NULL,
+    receiver_id INTEGER NOT NULL,
+    call_type TEXT NOT NULL CHECK(call_type IN ('audio', 'video')),
+    direction TEXT NOT NULL CHECK(direction IN ('incoming', 'outgoing')),
+    status TEXT NOT NULL CHECK(status IN ('completed', 'missed', 'rejected')),
+    duration INTEGER DEFAULT 0,
+    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at DATETIME DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (caller_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+  )`, (tableErr) => {
+    if (tableErr) {
+      console.error('Error ensuring call_history table exists:', tableErr);
+      return callback(tableErr);
+    }
+    
+    // Table exists, now proceed with the function
+    proceedWithCallHistory();
+  });
+};
+
+const getUserCallHistory = (userId, limit = 100, callback) => {
+  // Ensure call_history table exists before querying
+  db.run(`CREATE TABLE IF NOT EXISTS call_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    caller_id INTEGER NOT NULL,
+    receiver_id INTEGER NOT NULL,
+    call_type TEXT NOT NULL CHECK(call_type IN ('audio', 'video')),
+    direction TEXT NOT NULL CHECK(direction IN ('incoming', 'outgoing')),
+    status TEXT NOT NULL CHECK(status IN ('completed', 'missed', 'rejected')),
+    duration INTEGER DEFAULT 0,
+    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    ended_at DATETIME DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (caller_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+  )`, (tableErr) => {
+    if (tableErr) {
+      console.error('Error ensuring call_history table exists:', tableErr);
+      return callback(tableErr);
+    }
+    
+    const query = `
+      SELECT ch.*,
+             c.username as caller_username, c.avatar as caller_avatar,
+             r.username as receiver_username, r.avatar as receiver_avatar
+      FROM call_history ch
+      JOIN users c ON ch.caller_id = c.id
+      JOIN users r ON ch.receiver_id = r.id
+      WHERE ch.caller_id = ? OR ch.receiver_id = ?
+      ORDER BY ch.created_at DESC
+      LIMIT ?
+    `;
+    
+    db.all(query, [userId, userId, limit], (err, calls) => {
+      if (callback) {
+        // Transform the data to match frontend expectations
+        const transformedCalls = calls ? calls.map(call => ({
+          timestamp: new Date(call.created_at).getTime(),
+          duration: call.duration,
+          callType: call.call_type,
+          direction: call.caller_id === userId ? 'outgoing' : 'incoming',
+          status: call.status,
+          callerId: call.caller_id,
+          callerUsername: call.caller_username,
+          receiverId: call.receiver_id,
+          receiverUsername: call.receiver_username,
+          startedAt: call.started_at,
+          endedAt: call.ended_at
+        })) : [];
+        
+        callback(err, transformedCalls);
+      }
+    });
+  });
+};
+
+const deleteCallHistory = (callId, userId, callback) => {
+  // Only allow deletion if user was part of the call
+  const query = `DELETE FROM call_history WHERE id = ? AND (caller_id = ? OR receiver_id = ?)`;
+  db.run(query, [callId, userId, userId], callback);
+};
+
+const clearUserCallHistory = (userId, callback) => {
+  const query = `DELETE FROM call_history WHERE caller_id = ? OR receiver_id = ?`;
+  db.run(query, [userId, userId], callback);
+};
+
+const cleanupDuplicateCallHistory = (callback) => {
+  // Only remove duplicate missed calls that are within the same minute
+  // Keep completed and rejected calls as they represent different attempts
+  const query = `
+    DELETE FROM call_history 
+    WHERE status = 'missed' AND id NOT IN (
+      SELECT MIN(id) 
+      FROM call_history 
+      WHERE status = 'missed'
+      GROUP BY caller_id, receiver_id, call_type, datetime(created_at, 'start of minute')
+    )
+  `;
+  
+  db.run(query, (err) => {
+    if (err) {
+      console.error('Error cleaning up duplicate missed calls:', err);
+    } else {
+      console.log('✅ Cleaned up duplicate missed call entries');
+    }
+    if (callback) callback(err);
+  });
+};
+
 
 module.exports = {
   db,
@@ -1326,5 +1635,12 @@ module.exports = {
   toggleGroupPostLike,
   createGroupPostComment,
   getGroupPostComments,
-  deleteGroupPostComment
+  deleteGroupPostComment,
+  
+  // Call History Functions
+  createCallHistory,
+  getUserCallHistory,
+  deleteCallHistory,
+  clearUserCallHistory,
+  cleanupDuplicateCallHistory
 };

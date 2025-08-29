@@ -11,11 +11,20 @@ const LandingPage = () => {
     {
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
         </svg>
       ),
-      title: "Share Your Moments",
-      description: "Post photos, videos, and updates to keep your network engaged and informed."
+      title: "HD Voice & Video Calls",
+      description: "Make crystal-clear audio and video calls to any friend instantly with one-click calling from chat or contacts."
+    },
+    {
+      icon: (
+        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+      ),
+      title: "Call History & Analytics",
+      description: "Track all your calls with detailed history, duration tracking, and call analytics. Never miss important call details."
     },
     {
       icon: (
@@ -24,16 +33,16 @@ const LandingPage = () => {
         </svg>
       ),
       title: "Real-time Messaging",
-      description: "Chat instantly with friends and family with our lightning-fast messaging system."
+      description: "Chat instantly with friends and family with our lightning-fast messaging system and rich media sharing."
     },
     {
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       ),
-      title: "Friend Networks",
-      description: "Send and receive friend requests, build your social circle, and discover new connections."
+      title: "Share Your Moments",
+      description: "Post photos, videos, and updates to keep your network engaged with likes, comments, and reactions."
     },
     {
       icon: (
@@ -41,8 +50,8 @@ const LandingPage = () => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
         </svg>
       ),
-      title: "Create & Join Groups",
-      description: "Build communities around your interests and connect with like-minded people."
+      title: "Groups & Communities",
+      description: "Create and join groups, share in group chats, and build communities around your interests and hobbies."
     },
     {
       icon: (
@@ -51,16 +60,7 @@ const LandingPage = () => {
         </svg>
       ),
       title: "Stories & Updates",
-      description: "Share temporary stories and updates that disappear. Express yourself with photos and moments."
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      ),
-      title: "Custom Profiles",
-      description: "Personalize your profile with custom avatars, cover photos, and bios. Showcase who you are."
+      description: "Share temporary stories that disappear after 24 hours. Express yourself with photos, videos, and quick moments."
     }
   ];
 
@@ -143,12 +143,12 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 font-manrope leading-tight animate-fade-in-up">
-              Share, Connect & Chat
+              Share, Call & Connect
               <span className="text-indigo-600 block animate-fade-in-up" style={{animationDelay: '0.2s'}}>All in One Place</span>
             </h1>
             <p className="mt-4 sm:mt-6 text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl lg:max-w-3xl mx-auto leading-relaxed px-4 animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-              Create posts with photos and videos, chat in real-time, build friend networks, join groups, and share stories. 
-              Everything you need for authentic social connections in one beautifully designed platform.
+              Make HD voice and video calls, chat in real-time, share posts with photos and videos, track your call history, and build meaningful connections. 
+              Everything you need for authentic social interactions in one beautifully designed platform.
             </p>
             <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 animate-fade-in-up" style={{animationDelay: '0.6s'}}>
               <button
@@ -179,10 +179,10 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12 sm:mb-16">
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope ">
-              Everything you need for social connection
+              Complete Communication Suite
             </h2>
             <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4 ">
-              Powerful social features designed to bring people together
+              Voice calls, video calls, messaging, social posts, and detailed call tracking - all in one platform
             </p>
           </div>
 
@@ -217,12 +217,12 @@ const LandingPage = () => {
               <div className="text-base sm:text-xl text-gray-600 mt-2 ">Active Users</div>
             </div>
             <div className="animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-all duration-300">500K+</div>
-              <div className="text-base sm:text-xl text-gray-600 mt-2 ">Posts Shared</div>
+              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-all duration-300">1M+</div>
+              <div className="text-base sm:text-xl text-gray-600 mt-2 ">Calls Made</div>
             </div>
             <div className="animate-fade-in-up" style={{animationDelay: '0.6s'}}>
               <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-all duration-300">99.9%</div>
-              <div className="text-base sm:text-xl text-gray-600 mt-2 ">Uptime</div>
+              <div className="text-base sm:text-xl text-gray-600 mt-2 ">Call Quality</div>
             </div>
           </div>
         </div>
@@ -263,9 +263,9 @@ const LandingPage = () => {
               <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-all duration-300">
                 <span className="text-2xl font-bold">3</span>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope ">Share & Connect</h3>
+              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope ">Call, Share & Connect</h3>
               <p className="text-gray-600 leading-relaxed ">
-                Create posts with photos and videos, chat with friends, and share stories. Engage with your community!
+                Make voice and video calls, create posts with photos and videos, chat with friends, and track your communication history!
               </p>
             </div>
           </div>
@@ -296,7 +296,7 @@ const LandingPage = () => {
                 </div>
               </div>
               <p className="text-gray-600 mb-4">
-                "SocialHub has completely transformed how I connect with my friends. The social feed and messaging features make it easy to stay in touch with everyone."
+                "SocialHub has completely transformed how I connect with my friends. The HD voice calls, messaging, and call history tracking make it easy to stay in touch with everyone."
               </p>
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -320,7 +320,7 @@ const LandingPage = () => {
                 </div>
               </div>
               <p className="text-gray-600 mb-4">
-                "I love creating posts with photos and videos! The likes and comments make it so engaging. The groups feature helps me stay connected with my hobbies."
+                "I love the video calling feature and creating posts with photos! The call history helps me track important conversations. The groups feature keeps me connected with my hobbies."
               </p>
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -344,7 +344,7 @@ const LandingPage = () => {
                 </div>
               </div>
               <p className="text-gray-600 mb-4">
-                "The stories feature is amazing for sharing quick updates! My custom profile with cover photo really shows my personality. Love the interface!"
+                "The stories feature and one-click calling are amazing! My call history shows all my important conversations. Love how everything is integrated in one beautiful interface!"
               </p>
               <div className="flex items-center">
                 <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
@@ -370,7 +370,7 @@ const LandingPage = () => {
               </h2>
               <p className="text-base sm:text-lg text-gray-600 leading-relaxed mb-8">
                 At SocialHub, we prioritize your privacy and security above all else. Our platform uses industry-leading 
-                encryption and security measures to protect your conversations and data.
+                encryption and security measures to protect your calls, conversations, and personal data.
               </p>
               <div className="space-y-4">
                 <div className="flex items-start space-x-3 animate-fade-in-left" style={{animationDelay: '0.2s'}}>
@@ -381,7 +381,7 @@ const LandingPage = () => {
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-900 mb-1">End-to-End Encryption</h3>
-                    <p className="text-gray-600">All messages are encrypted and only you and your recipient can read them.</p>
+                    <p className="text-gray-600">All messages and calls are encrypted end-to-end. Only you and your recipient can access them.</p>
                   </div>
                 </div>
                 <div className="flex items-start space-x-3 animate-fade-in-left" style={{animationDelay: '0.4s'}}>

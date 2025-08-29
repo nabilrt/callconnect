@@ -33,6 +33,7 @@ class WebRTCService {
     this.socket.on('webrtc_ice_candidate', this.handleIceCandidate.bind(this));
     
     // Call management events
+    this.socket.on('call_initiated', this.handleCallInitiated.bind(this));
     this.socket.on('call_accepted', this.handleCallAccepted.bind(this));
     this.socket.on('call_ended', this.handleCallEnded.bind(this));
   }
@@ -162,31 +163,70 @@ class WebRTCService {
       const constraints = {
         audio: true,
         video: callType === 'video' ? {
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: 'user'
+          width: { ideal: 640, max: 1280 },
+          height: { ideal: 480, max: 720 },
+          facingMode: 'user',
+          frameRate: { ideal: 30, max: 30 }
         } : false
       };
 
-      console.log('🎥 Getting user media for:', callType, 'constraints:', constraints);
+      console.log('🎥 Getting user media for:', callType, 'constraints:', JSON.stringify(constraints, null, 2));
+      
       this.localStream = await navigator.mediaDevices.getUserMedia(constraints);
       
-      const hasVideo = this.localStream.getVideoTracks().length > 0;
-      console.log('🎥 Local stream has video:', hasVideo);
+      console.log('🎥 Stream created successfully:', this.localStream);
+      
+      const videoTracks = this.localStream.getVideoTracks();
+      const audioTracks = this.localStream.getAudioTracks();
+      const hasVideo = videoTracks.length > 0;
+      
+      console.log('🎥 Stream analysis - RAW VALUES:', {
+        hasVideo: hasVideo,
+        videoTracksCount: videoTracks.length,
+        audioTracksCount: audioTracks.length,
+        callType: this.currentCallType,
+        videoTracksArray: videoTracks,
+        audioTracksArray: audioTracks
+      });
+      
+      console.log('🎥 Video track details:');
+      videoTracks.forEach((track, index) => {
+        console.log(`  Track ${index}:`, {
+          id: track.id,
+          kind: track.kind,
+          enabled: track.enabled,
+          muted: track.muted,
+          readyState: track.readyState,
+          label: track.label
+        });
+      });
       
       // Dispatch event for UI to handle
       window.dispatchEvent(new CustomEvent('webrtc:localStream', {
         detail: { 
           stream: this.localStream,
-          hasVideo: hasVideo
+          hasVideo: hasVideo,
+          callType: this.currentCallType
         }
       }));
       
+      console.log('📺 Dispatched local stream event:', { hasVideo, callType: this.currentCallType });
+      
       return this.localStream;
     } catch (error) {
-      console.error('Error getting user media:', error);
+      console.error('🚨 Error getting user media:', error);
+      console.error('🚨 Error details:', {
+        name: error.name,
+        message: error.message,
+        constraint: error.constraint
+      });
       throw error;
     }
+  }
+
+  handleCallInitiated(data) {
+    this.currentCallId = data.callId;
+    this.currentCallType = data.callType;
   }
 
   async handleCallAccepted({ callId }) {
@@ -309,8 +349,6 @@ class WebRTCService {
   }
 
   endCall() {
-    console.log('📞 Ending call...');
-    
     if (this.currentCallId) {
       this.socket.emit('end_call', { callId: this.currentCallId });
     }

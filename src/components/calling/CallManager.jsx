@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import webrtcService from '../../services/webrtcService';
+import callHistoryService from '../../services/callHistoryService';
 import IncomingCallModal from './IncomingCallModal';
 import CallWindow from './CallWindow';
 
@@ -9,6 +10,7 @@ const CallManager = () => {
   const [incomingCall, setIncomingCall] = useState(null);
   const [currentCall, setCurrentCall] = useState(null);
   const [callStatus, setCallStatus] = useState('idle'); // idle, calling, ringing, connected
+
 
   useEffect(() => {
     if (!socket) return;
@@ -70,13 +72,18 @@ const CallManager = () => {
 
     const handleCallRejected = (data) => {
       console.log('Call rejected:', data);
+      
+      // Save as rejected call for the caller (not missed, since it was actively rejected)
+      if (currentCall && !currentCall.isReceiver) {
+        saveCallToHistory(currentCall, 0, 'rejected');
+      }
+      
       setCurrentCall(null);
       setCallStatus('idle');
       alert('Call was rejected');
     };
 
     const handleCallEnded = (data) => {
-      console.log('Call ended:', data);
       setCurrentCall(null);
       setIncomingCall(null);
       setCallStatus('idle');
@@ -94,6 +101,40 @@ const CallManager = () => {
       alert(`Call error: ${data.message}`);
     };
 
+    const handleCallTimeout = (data) => {
+      console.log('Call timeout:', data);
+      
+      // Save missed call if we were the one who didn't answer
+      if (incomingCall) {
+        saveCallToHistory({
+          callId: incomingCall.callId,
+          callerId: incomingCall.callerId,
+          callerUsername: incomingCall.callerUsername,
+          receiverId: user?.id,
+          receiverUsername: user?.username,
+          callType: incomingCall.callType,
+          isReceiver: true
+        }, 0, 'missed');
+      }
+      
+      // Save missed call if we were the caller and it timed out
+      if (currentCall && !currentCall.isReceiver) {
+        saveCallToHistory(currentCall, 0, 'missed');
+      }
+      
+      setCurrentCall(null);
+      setIncomingCall(null);
+      setCallStatus('idle');
+      
+      if (incomingCall) {
+        // We missed the incoming call
+        alert('Missed call');
+      } else {
+        // Our outgoing call wasn't answered
+        alert('Call not answered');
+      }
+    };
+
     // Add event listeners
     window.addEventListener('webrtc:connectionState', handleConnectionState);
     
@@ -104,6 +145,7 @@ const CallManager = () => {
     socket.on('call_rejected', handleCallRejected);
     socket.on('call_ended', handleCallEnded);
     socket.on('call_error', handleCallError);
+    socket.on('call_timeout', handleCallTimeout);
 
     return () => {
       // Remove event listeners
@@ -116,8 +158,30 @@ const CallManager = () => {
       socket.off('call_rejected', handleCallRejected);
       socket.off('call_ended', handleCallEnded);
       socket.off('call_error', handleCallError);
+      socket.off('call_timeout', handleCallTimeout);
     };
   }, [socket, currentCall]);
+
+  const saveCallToHistory = async (callData, duration = 0, status = 'completed') => {
+    if (!callData || !user) return;
+    
+    const callRecord = {
+      ...callData,
+      duration: duration,
+      status: status,
+      startedAt: new Date().toISOString(),
+      endedAt: duration > 0 ? new Date().toISOString() : null
+    };
+    
+    try {
+      // Transform to database format and save
+      const dbCallData = callHistoryService.transformToDbFormat(callRecord, user.id);
+      await callHistoryService.createCallHistory(dbCallData);
+    } catch (error) {
+      console.error('📞 Failed to save call to database from CallManager, using localStorage fallback');
+      // The service already handles localStorage fallback in case of error
+    }
+  };
 
   const handleAcceptCall = async () => {
     if (!incomingCall) return;
@@ -150,6 +214,17 @@ const CallManager = () => {
 
   const handleRejectCall = () => {
     if (incomingCall) {
+      // Save as missed call for the receiver (only when actively rejecting)
+      saveCallToHistory({
+        callId: incomingCall.callId,
+        callerId: incomingCall.callerId,
+        callerUsername: incomingCall.callerUsername,
+        receiverId: user?.id,
+        receiverUsername: user?.username,
+        callType: incomingCall.callType,
+        isReceiver: true
+      }, 0, 'missed');
+      
       socket.emit('reject_call', { callId: incomingCall.callId });
       setIncomingCall(null);
       setCallStatus('idle');

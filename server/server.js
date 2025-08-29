@@ -6,9 +6,10 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
-const { initializeDatabase, cleanupExpiredStories } = require('./database/db');
+const { initializeDatabase, cleanupExpiredStories, cleanupDuplicateCallHistory } = require('./database/db');
 const authRoutes = require('./routes/auth');
 const socialRoutes = require('./routes/social');
+const callRoutes = require('./routes/calls');
 const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
@@ -61,11 +62,13 @@ app.use((req, res, next) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/social', authenticateToken, socialRoutes);
+app.use('/api/calls', authenticateToken, callRoutes);
 
 initializeDatabase();
 
 const users = new Map();
 const activeCalls = new Map(); // Track active calls: callId -> { callerId, receiverId, type, status }
+const callTimeouts = new Map(); // Track call timeouts: callId -> timeoutId
 
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
@@ -215,6 +218,31 @@ io.on('connection', (socket) => {
     // Confirm to caller that call was initiated
     socket.emit('call_initiated', { callId, receiverId, callType });
     
+    // Set a timeout for the call (30 seconds)
+    const timeoutId = setTimeout(() => {
+      const call = activeCalls.get(callId);
+      if (call && call.status === 'ringing') {
+        console.log(`⏰ Call ${callId} timed out - no answer`);
+        
+        // Remove from active calls
+        activeCalls.delete(callId);
+        callTimeouts.delete(callId);
+        
+        // Notify both participants
+        const callerUser = users.get(call.callerId);
+        const receiverUser = users.get(call.receiverId);
+        
+        if (callerUser) {
+          io.to(callerUser.socketId).emit('call_timeout', { callId });
+        }
+        if (receiverUser) {
+          io.to(receiverUser.socketId).emit('call_timeout', { callId });
+        }
+      }
+    }, 30000); // 30 seconds
+    
+    callTimeouts.set(callId, timeoutId);
+    
     console.log(`📞 Call initiated: ${socket.username} -> ${receiverUser.username} (${callType})`);
   });
 
@@ -225,6 +253,13 @@ io.on('connection', (socket) => {
     if (!call || call.receiverId !== socket.userId) {
       socket.emit('call_error', { message: 'Invalid call' });
       return;
+    }
+
+    // Clear the timeout since call is accepted
+    const timeoutId = callTimeouts.get(callId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      callTimeouts.delete(callId);
     }
 
     // Update call status
@@ -248,6 +283,13 @@ io.on('connection', (socket) => {
       return;
     }
 
+    // Clear the timeout since call is rejected
+    const timeoutId = callTimeouts.get(callId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      callTimeouts.delete(callId);
+    }
+
     // Remove call from active calls
     activeCalls.delete(callId);
 
@@ -265,6 +307,13 @@ io.on('connection', (socket) => {
     
     if (!call || (call.callerId !== socket.userId && call.receiverId !== socket.userId)) {
       return;
+    }
+
+    // Clear the timeout if it exists
+    const timeoutId = callTimeouts.get(callId);
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      callTimeouts.delete(callId);
     }
 
     // Remove call from active calls
@@ -387,6 +436,15 @@ cleanupExpiredStories((err) => {
     console.error('❌ Error during initial story cleanup:', err);
   } else {
     console.log('🧹 Initial expired stories cleanup completed');
+  }
+});
+
+// Cleanup duplicate call history on server start
+cleanupDuplicateCallHistory((err) => {
+  if (err) {
+    console.error('❌ Error during initial call history cleanup:', err);
+  } else {
+    console.log('🧹 Initial call history cleanup completed');
   }
 });
 
