@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import LoginForm from '../components/auth/LoginForm';
 import RegisterForm from '../components/auth/RegisterForm';
 import Logo from '../components/ui/Logo';
@@ -6,63 +6,368 @@ import Logo from '../components/ui/Logo';
 const LandingPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [showAuth, setShowAuth] = useState(false);
+  const [sections, setSections] = useState([]);
+  const [settings, setSettings] = useState({});
+  const [loading, setLoading] = useState(true);
 
-  const features = [
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-        </svg>
-      ),
-      title: "HD Voice & Video Calls",
-      description: "Make crystal-clear audio and video calls to any friend instantly with one-click calling from chat or contacts."
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      ),
-      title: "Call History & Analytics",
-      description: "Track all your calls with detailed history, duration tracking, and call analytics. Never miss important call details."
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-        </svg>
-      ),
-      title: "Real-time Messaging",
-      description: "Chat instantly with friends and family with our lightning-fast messaging system and rich media sharing."
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-        </svg>
-      ),
-      title: "Share Your Moments",
-      description: "Post photos, videos, and updates to keep your network engaged with likes, comments, and reactions."
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-        </svg>
-      ),
-      title: "Groups & Communities",
-      description: "Create and join groups, share in group chats, and build communities around your interests and hobbies."
-    },
-    {
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 4V2a1 1 0 011-1h8a1 1 0 011 1v2m0 0V1a1 1 0 011 1v3M7 4H6a2 2 0 00-2 2v11a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1m0 0V1a1 1 0 00-1-1H8a1 1 0 00-1 1v3m8 0H8m0 0v2m0 0V4m0 2h8V4" />
-        </svg>
-      ),
-      title: "Stories & Updates",
-      description: "Share temporary stories that disappear after 24 hours. Express yourself with photos, videos, and quick moments."
+  // Fetch dynamic content and settings from the API
+  useEffect(() => {
+    const fetchContent = async () => {
+      try {
+        const [contentResponse, settingsResponse] = await Promise.all([
+          fetch('/api/content/sections'),
+          fetch('/api/settings/public')
+        ]);
+        
+        if (contentResponse.ok) {
+          const contentData = await contentResponse.json();
+          setSections(contentData.filter(section => section.enabled).sort((a, b) => a.section_order - b.section_order));
+        } else {
+          console.error('Failed to fetch content sections');
+        }
+        
+        if (settingsResponse.ok) {
+          const settingsData = await settingsResponse.json();
+          setSettings(settingsData);
+          
+          // Update document title
+          if (settingsData.siteName) {
+            document.title = settingsData.siteName;
+          }
+        } else {
+          console.error('Failed to fetch settings');
+        }
+      } catch (error) {
+        console.error('Error fetching content:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchContent();
+  }, []);
+
+  // Component to render different section types dynamically
+  const renderSection = (section) => {
+    const handleButtonClick = (buttonLink) => {
+      if (buttonLink === '/signup') {
+        setIsLogin(false);
+        setShowAuth(true);
+      } else if (buttonLink === '/login') {
+        setIsLogin(true);
+        setShowAuth(true);
+      }
+    };
+
+    switch (section.type) {
+      case 'hero':
+        return (
+          <section key={section.id} className="py-12 sm:py-16 lg:py-20 bg-gray-50 overflow-hidden">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 font-manrope leading-tight animate-fade-in-up">
+                  {section.title}
+                </h1>
+                <p className="mt-4 sm:mt-6 text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl lg:max-w-3xl mx-auto leading-relaxed px-4 animate-fade-in-up" style={{animationDelay: '0.4s'}}>
+                  {section.content}
+                </p>
+                <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 animate-fade-in-up" style={{animationDelay: '0.6s'}}>
+                  {section.button_text && (
+                    <button
+                      onClick={() => handleButtonClick(section.button_link)}
+                      className="bg-indigo-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-semibold hover:bg-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform"
+                    >
+                      {section.button_text}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      setIsLogin(true);
+                      setShowAuth(true);
+                    }}
+                    className="bg-white text-gray-900 px-6 sm:px-8 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-semibold border border-gray-300 hover:border-gray-400 transition-all duration-300 hover:shadow-lg hover:scale-105 transform"
+                  >
+                    Sign In
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+
+      case 'features':
+        return (
+          <section key={section.id} className="py-12 sm:py-16 lg:py-20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12 sm:mb-16">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
+                  {section.title}
+                </h2>
+                <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
+                  {section.content}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+                {section.features?.map((feature, index) => (
+                  <div 
+                    key={feature.id} 
+                    className="text-center p-4 sm:p-6 rounded-2xl border border-gray-100 hover:border-gray-200 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-2 transform animate-fade-in-up group"
+                    style={{animationDelay: `${0.2 * index}s`}}
+                  >
+                    <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl mb-4 group-hover:scale-110 transition-all duration-300 text-2xl">
+                      {feature.icon}
+                    </div>
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3 font-manrope">
+                      {feature.title}
+                    </h3>
+                    <p className="text-sm sm:text-base text-gray-600 leading-relaxed">
+                      {feature.description}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+
+      case 'stats':
+        return (
+          <section key={section.id} className="py-12 sm:py-16 lg:py-20 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12 sm:mb-16">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
+                  {section.title}
+                </h2>
+                <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
+                  {section.content}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 text-center">
+                {section.stats?.map((stat, index) => (
+                  <div key={stat.id} className="animate-fade-in-up" style={{animationDelay: `${0.2 * (index + 1)}s`}}>
+                    <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-all duration-300">{stat.value}</div>
+                    <div className="text-base sm:text-xl text-gray-600 mt-2">{stat.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+
+      case 'testimonials':
+        return (
+          <section key={section.id} className="py-12 sm:py-16 lg:py-20">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12 sm:mb-16">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
+                  {section.title}
+                </h2>
+                <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
+                  {section.content}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
+                {section.testimonials?.map((testimonial, index) => (
+                  <div key={testimonial.id} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 transform animate-fade-in-up" style={{animationDelay: `${0.2 * (index + 1)}s`}}>
+                    <div className="flex items-center mb-4">
+                      <div className="flex space-x-1">
+                        {[...Array(testimonial.rating || 5)].map((_, i) => (
+                          <svg key={i} className="w-5 h-5 text-yellow-400 hover:scale-110 transition-transform duration-200" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-gray-600 mb-4">
+                      "{testimonial.content}"
+                    </p>
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <span className="text-indigo-600 font-semibold text-sm">
+                          {testimonial.name.split(' ').map(n => n[0]).join('')}
+                        </span>
+                      </div>
+                      <div className="ml-3">
+                        <p className="font-semibold text-gray-900">{testimonial.name}</p>
+                        <p className="text-sm text-gray-500">{testimonial.role}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        );
+
+      case 'security':
+        return (
+          <section key={section.id} className="py-12 sm:py-16 lg:py-20 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+                <div className="animate-fade-in-left">
+                  <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope mb-6">
+                    {section.title}
+                  </h2>
+                  <p className="text-base sm:text-lg text-gray-600 leading-relaxed mb-8">
+                    {section.content}
+                  </p>
+                  <div className="space-y-4">
+                    <div className="flex items-start space-x-3 animate-fade-in-left" style={{animationDelay: '0.2s'}}>
+                      <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1 hover:scale-110 transition-transform duration-300">
+                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 mb-1">End-to-End Encryption</h3>
+                        <p className="text-gray-600">All messages and calls are encrypted end-to-end. Only you and your recipient can access them.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3 animate-fade-in-left" style={{animationDelay: '0.4s'}}>
+                      <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1 hover:scale-110 transition-transform duration-300">
+                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 mb-1">Secure File Sharing</h3>
+                        <p className="text-gray-600">Share files safely with advanced security protocols and virus scanning.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-3 animate-fade-in-left" style={{animationDelay: '0.6s'}}>
+                      <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1 hover:scale-110 transition-transform duration-300">
+                        <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900 mb-1">GDPR Compliant</h3>
+                        <p className="text-gray-600">We follow strict privacy regulations to protect your personal information.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="relative animate-fade-in-right">
+                  <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100 hover:shadow-xl hover:-translate-y-2 transition-all duration-300 transform">
+                    <div className="flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-6 mx-auto hover:scale-110 hover:bg-indigo-200 transition-all duration-300 animate-pulse">
+                      <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-900 text-center mb-4 font-manrope">
+                      Bank-Level Security
+                    </h3>
+                    <p className="text-gray-600 text-center leading-relaxed">
+                      Your conversations are protected with the same level of security used by major financial institutions.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+
+      case 'how_it_works':
+        return (
+          <section key={section.id} className="py-12 sm:py-16 lg:py-20 bg-gray-50">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="text-center mb-12 sm:mb-16">
+                <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
+                  {section.title}
+                </h2>
+                <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
+                  {section.content}
+                </p>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
+                <div className="text-center animate-fade-in-up" style={{animationDelay: '0.2s'}}>
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 transition-all duration-300">
+                    <span className="text-2xl font-bold">1</span>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope">Sign Up</h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Create your account in seconds with just your email and username. No complex setup required.
+                  </p>
+                </div>
+                <div className="text-center animate-fade-in-up" style={{animationDelay: '0.4s'}}>
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 transition-all duration-300">
+                    <span className="text-2xl font-bold">2</span>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope">Build Your Network</h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Send friend requests, customize your profile, and join groups that match your interests.
+                  </p>
+                </div>
+                <div className="text-center animate-fade-in-up" style={{animationDelay: '0.6s'}}>
+                  <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 transition-all duration-300">
+                    <span className="text-2xl font-bold">3</span>
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope">Call, Share & Connect</h3>
+                  <p className="text-gray-600 leading-relaxed">
+                    Make voice and video calls, create posts with photos and videos, chat with friends, and track your communication history!
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+
+      case 'cta':
+        return (
+          <section key={section.id} className="py-12 sm:py-16 lg:py-20">
+            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
+                {section.title}
+              </h2>
+              <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
+                {section.content}
+              </p>
+              {section.button_text && (
+                <button
+                  onClick={() => handleButtonClick(section.button_link)}
+                  className="mt-6 sm:mt-8 bg-indigo-600 text-white px-8 sm:px-10 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-semibold hover:bg-indigo-700 transition-colors shadow-lg"
+                >
+                  {section.button_text}
+                </button>
+              )}
+            </div>
+          </section>
+        );
+
+      default:
+        return null;
     }
-  ];
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  // Show maintenance mode if enabled
+  if (settings.maintenanceMode) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-8 text-center">
+          <div className="mb-6">
+            <svg className="w-16 h-16 text-yellow-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Maintenance Mode</h2>
+            <p className="text-gray-600 mb-4">
+              {settings.siteName || 'CallConnect'} is currently under maintenance. We'll be back soon!
+            </p>
+            <p className="text-sm text-gray-500">
+              We're working on improvements to make your experience even better.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (showAuth) {
     return (
@@ -86,7 +391,7 @@ const LandingPage = () => {
               <div className="mb-4 flex justify-center">
                 <Logo size="lg" showText={false} />
               </div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 font-manrope">SocialHub</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 font-manrope">{settings.siteName || 'CallConnect'}</h1>
               <p className="text-gray-600 mt-2 text-sm sm:text-base">
                 {isLogin ? 'Welcome back! Sign in to continue connecting' : 'Join thousands of users connecting daily'}
               </p>
@@ -94,8 +399,19 @@ const LandingPage = () => {
 
             {isLogin ? (
               <LoginForm onSwitchToRegister={() => setIsLogin(false)} />
-            ) : (
+            ) : settings.registrationEnabled !== false ? (
               <RegisterForm onSwitchToLogin={() => setIsLogin(true)} />
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-600 mb-2">Registration is currently disabled.</p>
+                <p className="text-sm text-gray-500">Please contact an administrator.</p>
+                <button
+                  onClick={() => setIsLogin(true)}
+                  className="mt-4 text-indigo-600 hover:text-indigo-500 text-sm"
+                >
+                  Back to Sign In
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -138,315 +454,8 @@ const LandingPage = () => {
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-gray-50overflow-hidden">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 font-manrope leading-tight animate-fade-in-up">
-              Share, Call & Connect
-              <span className="text-indigo-600 block animate-fade-in-up" style={{animationDelay: '0.2s'}}>All in One Place</span>
-            </h1>
-            <p className="mt-4 sm:mt-6 text-base sm:text-lg lg:text-xl text-gray-600 max-w-2xl lg:max-w-3xl mx-auto leading-relaxed px-4 animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-              Make HD voice and video calls, chat in real-time, share posts with photos and videos, track your call history, and build meaningful connections. 
-              Everything you need for authentic social interactions in one beautifully designed platform.
-            </p>
-            <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center px-4 animate-fade-in-up" style={{animationDelay: '0.6s'}}>
-              <button
-                onClick={() => {
-                  setIsLogin(false);
-                  setShowAuth(true);
-                }}
-                className="bg-indigo-600 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-semibold hover:bg-indigo-700 transition-all duration-300 shadow-lg hover:shadow-xl hover:scale-105 transform"
-              >
-                Join SocialHub Free
-              </button>
-              <button
-                onClick={() => {
-                  setIsLogin(true);
-                  setShowAuth(true);
-                }}
-                className="bg-white text-gray-900 px-6 sm:px-8 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-semibold border border-gray-300 hover:border-gray-400 transition-all duration-300 hover:shadow-lg hover:scale-105 transform"
-              >
-                Sign In
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section className="py-12 sm:py-16 lg:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope ">
-              Complete Communication Suite
-            </h2>
-            <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4 ">
-              Voice calls, video calls, messaging, social posts, and detailed call tracking - all in one platform
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            {features.map((feature, index) => (
-              <div 
-                key={index} 
-                className="text-center p-4 sm:p-6 rounded-2xl border border-gray-100 hover:border-gray-200 dark:hover:border-gray-600 bg-white transition-all duration-300 hover:shadow-lg hover:-translate-y-2 transform animate-fade-in-up group"
-                style={{animationDelay: `${0.2 * index}s`}}
-              >
-                <div className="inline-flex items-center justify-center w-12 h-12 bg-indigo-100 text-indigo-600 rounded-xl mb-4 group-hover:scale-110 transition-all duration-300">
-                  {feature.icon}
-                </div>
-                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 sm:mb-3 font-manrope ">
-                  {feature.title}
-                </h3>
-                <p className="text-sm sm:text-base text-gray-600 leading-relaxed ">
-                  {feature.description}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Stats Section */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8 text-center">
-            <div className="animate-fade-in-up" style={{animationDelay: '0.2s'}}>
-              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-all duration-300">25K+</div>
-              <div className="text-base sm:text-xl text-gray-600 mt-2 ">Active Users</div>
-            </div>
-            <div className="animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-all duration-300">1M+</div>
-              <div className="text-base sm:text-xl text-gray-600 mt-2 ">Calls Made</div>
-            </div>
-            <div className="animate-fade-in-up" style={{animationDelay: '0.6s'}}>
-              <div className="text-3xl sm:text-4xl font-bold text-indigo-600 font-manrope hover:scale-110 transition-all duration-300">99.9%</div>
-              <div className="text-base sm:text-xl text-gray-600 mt-2 ">Call Quality</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works Section */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope ">
-              How SocialHub Works
-            </h2>
-            <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4 ">
-              Get started in three simple steps
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
-            <div className="text-center animate-fade-in-up" style={{animationDelay: '0.2s'}}>
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-all duration-300">
-                <span className="text-2xl font-bold">1</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope ">Sign Up</h3>
-              <p className="text-gray-600 leading-relaxed ">
-                Create your account in seconds with just your email and username. No complex setup required.
-              </p>
-            </div>
-            <div className="text-center animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-all duration-300">
-                <span className="text-2xl font-bold">2</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope ">Build Your Network</h3>
-              <p className="text-gray-600 leading-relaxed ">
-                Send friend requests, customize your profile, and join groups that match your interests.
-              </p>
-            </div>
-            <div className="text-center animate-fade-in-up" style={{animationDelay: '0.6s'}}>
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-100 text-indigo-600 rounded-full mb-6 hover:scale-110 hover:bg-indigo-200 dark:hover:bg-indigo-900/50 transition-all duration-300">
-                <span className="text-2xl font-bold">3</span>
-              </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4 font-manrope ">Call, Share & Connect</h3>
-              <p className="text-gray-600 leading-relaxed ">
-                Make voice and video calls, create posts with photos and videos, chat with friends, and track your communication history!
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section className="py-12 sm:py-16 lg:py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12 sm:mb-16">
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope ">
-              What Our Users Say
-            </h2>
-            <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4 ">
-              Join thousands of satisfied users worldwide
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 transform animate-fade-in-up" style={{animationDelay: '0.2s'}}>
-              <div className="flex items-center mb-4">
-                <div className="flex space-x-1">
-                  {[...Array(5)].map((_, i) => (
-                    <svg key={i} className="w-5 h-5 text-yellow-400 hover:scale-110 transition-transform duration-200" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-              </div>
-              <p className="text-gray-600 mb-4">
-                "SocialHub has completely transformed how I connect with my friends. The HD voice calls, messaging, and call history tracking make it easy to stay in touch with everyone."
-              </p>
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                  <span className="text-indigo-600 font-semibold text-sm">SJ</span>
-                </div>
-                <div className="ml-3">
-                  <p className="font-semibold text-gray-900">Sarah Johnson</p>
-                  <p className="text-sm text-gray-500">Product Manager</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 transform animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-              <div className="flex items-center mb-4">
-                <div className="flex space-x-1">
-                  {[...Array(5)].map((_, i) => (
-                    <svg key={i} className="w-5 h-5 text-yellow-400 hover:scale-110 transition-transform duration-200" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-              </div>
-              <p className="text-gray-600 mb-4">
-                "I love the video calling feature and creating posts with photos! The call history helps me track important conversations. The groups feature keeps me connected with my hobbies."
-              </p>
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                  <span className="text-indigo-600 font-semibold text-sm">MC</span>
-                </div>
-                <div className="ml-3">
-                  <p className="font-semibold text-gray-900">Michael Chen</p>
-                  <p className="text-sm text-gray-500">Designer</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 transform animate-fade-in-up" style={{animationDelay: '0.6s'}}>
-              <div className="flex items-center mb-4">
-                <div className="flex space-x-1">
-                  {[...Array(5)].map((_, i) => (
-                    <svg key={i} className="w-5 h-5 text-yellow-400 hover:scale-110 transition-transform duration-200" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-              </div>
-              <p className="text-gray-600 mb-4">
-                "The stories feature and one-click calling are amazing! My call history shows all my important conversations. Love how everything is integrated in one beautiful interface!"
-              </p>
-              <div className="flex items-center">
-                <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center">
-                  <span className="text-indigo-600 font-semibold text-sm">ER</span>
-                </div>
-                <div className="ml-3">
-                  <p className="font-semibold text-gray-900">Emily Rodriguez</p>
-                  <p className="text-sm text-gray-500">Marketing Director</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Security Section */}
-      <section className="py-12 sm:py-16 lg:py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-            <div className="animate-fade-in-left">
-              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope mb-6">
-                Your Privacy & Security Matter
-              </h2>
-              <p className="text-base sm:text-lg text-gray-600 leading-relaxed mb-8">
-                At SocialHub, we prioritize your privacy and security above all else. Our platform uses industry-leading 
-                encryption and security measures to protect your calls, conversations, and personal data.
-              </p>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3 animate-fade-in-left" style={{animationDelay: '0.2s'}}>
-                  <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1 hover:scale-110 transition-transform duration-300">
-                    <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">End-to-End Encryption</h3>
-                    <p className="text-gray-600">All messages and calls are encrypted end-to-end. Only you and your recipient can access them.</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3 animate-fade-in-left" style={{animationDelay: '0.4s'}}>
-                  <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1 hover:scale-110 transition-transform duration-300">
-                    <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">Secure File Sharing</h3>
-                    <p className="text-gray-600">Share files safely with advanced security protocols and virus scanning.</p>
-                  </div>
-                </div>
-                <div className="flex items-start space-x-3 animate-fade-in-left" style={{animationDelay: '0.6s'}}>
-                  <div className="flex-shrink-0 w-6 h-6 bg-green-100 rounded-full flex items-center justify-center mt-1 hover:scale-110 transition-transform duration-300">
-                    <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-gray-900 mb-1">GDPR Compliant</h3>
-                    <p className="text-gray-600">We follow strict privacy regulations to protect your personal information.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="relative animate-fade-in-right">
-              <div className="bg-white rounded-2xl shadow-lg p-8 border border-gray-100 hover:shadow-xl hover:-translate-y-2 transition-all duration-300 transform">
-                <div className="flex items-center justify-center w-16 h-16 bg-indigo-100 rounded-full mb-6 mx-auto hover:scale-110 hover:bg-indigo-200 transition-all duration-300 animate-pulse">
-                  <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold text-gray-900 text-center mb-4 font-manrope">
-                  Bank-Level Security
-                </h3>
-                <p className="text-gray-600 text-center leading-relaxed">
-                  Your conversations are protected with the same level of security used by major financial institutions.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-12 sm:py-16 lg:py-20">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 font-manrope">
-            Ready to join the conversation?
-          </h2>
-          <p className="mt-3 sm:mt-4 text-base sm:text-lg lg:text-xl text-gray-600 px-4">
-            Create your account today and start connecting with friends instantly.
-          </p>
-          <button
-            onClick={() => {
-              setIsLogin(false);
-              setShowAuth(true);
-            }}
-            className="mt-6 sm:mt-8 bg-indigo-600 text-white px-8 sm:px-10 py-3 sm:py-4 rounded-xl text-base sm:text-lg font-semibold hover:bg-indigo-700 transition-colors shadow-lg"
-          >
-            Get Started Now
-          </button>
-        </div>
-      </section>
+      {/* Dynamic Sections */}
+      {sections.map(section => renderSection(section))}
 
       {/* Footer */}
       <footer className="bg-gray-900 text-white py-12 sm:py-16 lg:py-20">

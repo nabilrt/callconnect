@@ -3,9 +3,7 @@ import {
   MagnifyingGlassIcon, 
   FunnelIcon,
   EyeIcon,
-  PencilIcon,
   TrashIcon,
-  UserPlusIcon,
   ExclamationTriangleIcon,
   ChartBarIcon,
   EnvelopeIcon,
@@ -23,7 +21,7 @@ const UserManagement = () => {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFilter, setSelectedFilter] = useState('all');
-  const [showUserModal, setShowUserModal] = useState(false);
+  const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bulkActions, setBulkActions] = useState(false);
@@ -33,96 +31,32 @@ const UserManagement = () => {
   const [exportLoading, setExportLoading] = useState(false);
   const [activityData, setActivityData] = useState({});
 
-  // Mock user data - replace with actual API call
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // Replace with actual API call
-        const mockUsers = [
-          {
-            id: 1,
-            username: 'nabilrt',
-            email: 'nabil@example.com',
-            fullName: 'Nabil Rahman',
-            joinDate: '2024-01-15',
-            lastActive: '2024-08-29',
-            status: 'active',
-            role: 'user',
-            postsCount: 23,
-            friendsCount: 156,
-            callsCount: 89,
-            location: 'New York, USA',
-            phone: '+1 (555) 123-4567',
-            subscription: 'Premium',
-            storageUsed: '2.5GB',
-            loginAttempts: 0,
-            tags: ['VIP', 'Developer'],
-            notes: 'Premium user since Jan 2024',
-            registrationIP: '192.168.1.1',
-            lastLoginIP: '10.0.0.1',
-            emailVerified: true,
-            twoFactorEnabled: true
-          },
-          {
-            id: 2,
-            username: 'admin',
-            email: 'admin@socialhub.com',
-            fullName: 'System Administrator',
-            joinDate: '2024-01-01',
-            lastActive: '2024-08-29',
-            status: 'active',
-            role: 'admin',
-            postsCount: 0,
-            friendsCount: 0,
-            callsCount: 0,
-            location: 'Administrative Access',
-            phone: 'N/A',
-            subscription: 'System Admin',
-            storageUsed: '0GB',
-            loginAttempts: 0,
-            tags: ['System', 'Super Admin', 'Protected'],
-            notes: 'Primary system administrator account - PROTECTED',
-            registrationIP: '127.0.0.1',
-            lastLoginIP: '127.0.0.1',
-            emailVerified: true,
-            twoFactorEnabled: true,
-            isProtected: true
-          },
-          {
-            id: 3,
-            username: 'rosanne',
-            email: 'rosanne@example.com',
-            fullName: 'Rosanne Smith',
-            joinDate: '2024-02-20',
-            lastActive: '2024-08-28',
-            status: 'active',
-            role: 'user',
-            postsCount: 45,
-            friendsCount: 203,
-            callsCount: 167,
-            location: 'London, UK',
-            phone: '+44 20 7946 0958',
-            subscription: 'Free',
-            storageUsed: '1.2GB',
-            loginAttempts: 0,
-            tags: ['Power User'],
-            notes: 'Very active community member',
-            registrationIP: '84.91.168.12',
-            lastLoginIP: '84.91.168.15',
-            emailVerified: true,
-            twoFactorEnabled: false
-          }
-        ];
-        
-        setUsers(mockUsers);
-        setFilteredUsers(mockUsers);
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching users:', error);
-        setLoading(false);
+  // Fetch users from API
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
       }
-    };
+      
+      const userData = await response.json();
+      setUsers(userData);
+      setFilteredUsers(userData);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchUsers();
   }, []);
 
@@ -147,16 +81,37 @@ const UserManagement = () => {
 
   const handleViewUser = (user) => {
     setSelectedUser(user);
-    setShowUserModal(true);
+    setShowUserDetailsModal(true);
   };
 
-  const handleDeleteUser = (userId) => {
-    if (window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      setUsers(users.filter(user => user.id !== userId));
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        setUsers(users.filter(user => user.id !== userId));
+      } else {
+        console.error('Failed to delete user');
+        alert('Failed to delete user. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      alert('Error deleting user. Please try again.');
     }
   };
 
-  const handleBulkAction = (action) => {
+  const handleBulkAction = async (action) => {
     if (selectedUsers.length === 0) return;
     
     // Filter out protected admin accounts
@@ -171,25 +126,35 @@ const UserManagement = () => {
       return;
     }
     
-    switch (action) {
-      case 'delete':
-        if (window.confirm(`Delete ${actionableUsers.length} users? This action cannot be undone.`)) {
-          setUsers(users.filter(user => !actionableUsers.includes(user.id)));
-          setSelectedUsers([]);
-        }
-        break;
-      case 'activate':
-        setUsers(users.map(user => 
-          actionableUsers.includes(user.id) ? { ...user, status: 'active' } : user
-        ));
+    if (action === 'delete' && !window.confirm(`Delete ${actionableUsers.length} users? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/users/bulk', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          action,
+          userIds: actionableUsers
+        })
+      });
+
+      if (response.ok) {
+        // Refresh user list after bulk operation
+        await fetchUsers();
         setSelectedUsers([]);
-        break;
-      case 'deactivate':
-        setUsers(users.map(user => 
-          actionableUsers.includes(user.id) ? { ...user, status: 'inactive' } : user
-        ));
-        setSelectedUsers([]);
-        break;
+      } else {
+        console.error('Failed to perform bulk action');
+        alert('Failed to perform bulk action. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error performing bulk action:', error);
+      alert('Error performing bulk action. Please try again.');
     }
   };
 
@@ -221,10 +186,35 @@ const UserManagement = () => {
     console.log('Sending notification to user:', userId);
   };
 
-  const handleUserStatusChange = (userId, newStatus) => {
-    setUsers(users.map(user => 
-      user.id === userId ? { ...user, status: newStatus } : user
-    ));
+  const handleUserStatusChange = async (userId, newStatus) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/users/${userId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (response.ok) {
+        setUsers(users.map(user => 
+          user.id === userId ? { ...user, status: newStatus } : user
+        ));
+        
+        // Update selected user if it's being viewed
+        if (selectedUser && selectedUser.id === userId) {
+          setSelectedUser({ ...selectedUser, status: newStatus });
+        }
+      } else {
+        console.error('Failed to update user status');
+        alert('Failed to update user status. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error updating user status:', error);
+      alert('Error updating user status. Please try again.');
+    }
   };
 
   const toggleUserSelection = (userId) => {
@@ -294,13 +284,6 @@ const UserManagement = () => {
           >
             <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
             {exportLoading ? 'Exporting...' : 'Export CSV'}
-          </button>
-          <button 
-            onClick={() => setShowUserModal(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 flex items-center"
-          >
-            <UserPlusIcon className="w-4 h-4 mr-2" />
-            Add User
           </button>
         </div>
       </div>
@@ -503,16 +486,6 @@ const UserManagement = () => {
                       >
                         <EyeIcon className="w-4 h-4" />
                       </button>
-                      <button
-                        className="text-gray-600 hover:text-gray-900"
-                        title="Edit User"
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowUserModal(true);
-                        }}
-                      >
-                        <PencilIcon className="w-4 h-4" />
-                      </button>
                       {!user.isProtected && user.email !== 'admin@socialhub.com' && (
                         <button
                           onClick={() => handleDeleteUser(user.id)}
@@ -537,7 +510,7 @@ const UserManagement = () => {
       </div>
 
       {/* User Details Modal */}
-      {showUserModal && selectedUser && (
+      {showUserDetailsModal && selectedUser && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-screen overflow-y-auto">
             <div className="p-6 border-b">
@@ -547,7 +520,7 @@ const UserManagement = () => {
                   <p className="text-sm text-gray-500">Complete profile information</p>
                 </div>
                 <button
-                  onClick={() => setShowUserModal(false)}
+                  onClick={() => setShowUserDetailsModal(false)}
                   className="text-gray-400 hover:text-gray-600"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -701,13 +674,10 @@ const UserManagement = () => {
               {/* Actions */}
               <div className="flex justify-end space-x-3 pt-6 border-t">
                 <button
-                  onClick={() => setShowUserModal(false)}
+                  onClick={() => setShowUserDetailsModal(false)}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                 >
                   Close
-                </button>
-                <button className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
-                  Edit User
                 </button>
               </div>
             </div>

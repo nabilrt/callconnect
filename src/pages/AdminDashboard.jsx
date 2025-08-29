@@ -5,6 +5,7 @@ import AdminHeader from '../components/admin/AdminHeader';
 import UserManagement from '../components/admin/UserManagement';
 import ContentManagement from '../components/admin/ContentManagement';
 import AnalyticsDashboard from '../components/admin/AnalyticsDashboard';
+import CallManagement from '../components/admin/CallManagement';
 import SystemSettings from '../components/admin/SystemSettings';
 import LandingPageManager from '../components/admin/LandingPageManager';
 
@@ -46,6 +47,8 @@ const AdminDashboard = () => {
         return <UserManagement />;
       case 'content':
         return <ContentManagement />;
+      case 'calls':
+        return <CallManagement />;
       case 'landing':
         return <LandingPageManager />;
       case 'settings':

@@ -11,40 +11,13 @@ import {
 } from '@heroicons/react/24/outline';
 
 const SystemSettings = () => {
-  const [settings, setSettings] = useState({
-    general: {
-      siteName: 'CallConnect',
-      siteDescription: 'Professional video calling platform',
-      maintenanceMode: false,
-      registrationEnabled: true,
-      maxUsersPerCall: 8,
-      defaultCallDuration: 60
-    },
-    security: {
-      passwordMinLength: 8,
-      requireTwoFactor: false,
-      sessionTimeout: 1440,
-      maxLoginAttempts: 5,
-      enableRateLimiting: true
-    },
-    notifications: {
-      emailEnabled: true,
-      pushEnabled: true,
-      smsEnabled: false,
-      adminAlerts: true,
-      userWelcomeEmail: true
-    },
-    storage: {
-      maxFileSize: 100,
-      allowedFileTypes: ['jpg', 'jpeg', 'png', 'gif', 'pdf', 'doc', 'docx'],
-      recordingsRetention: 30,
-      cleanupSchedule: 'weekly'
-    }
-  });
-
+  const [settings, setSettings] = useState({});
+  const [systemInfo, setSystemInfo] = useState({});
   const [activeTab, setActiveTab] = useState('general');
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [message, setMessage] = useState(null);
+  const [error, setError] = useState(null);
 
   const tabs = [
     { id: 'general', name: 'General', icon: CogIcon },
@@ -52,6 +25,43 @@ const SystemSettings = () => {
     { id: 'notifications', name: 'Notifications', icon: BellIcon },
     { id: 'storage', name: 'Storage', icon: CircleStackIcon }
   ];
+
+  // Fetch settings from API
+  const fetchSettings = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      const [settingsRes, systemInfoRes] = await Promise.all([
+        fetch('/api/settings', { headers }),
+        fetch('/api/settings/system-info', { headers })
+      ]);
+
+      if (!settingsRes.ok || !systemInfoRes.ok) {
+        throw new Error('Failed to fetch settings');
+      }
+
+      const [settingsData, systemInfoData] = await Promise.all([
+        settingsRes.json(),
+        systemInfoRes.json()
+      ]);
+
+      setSettings(settingsData);
+      setSystemInfo(systemInfoData);
+    } catch (error) {
+      console.error('Error fetching settings:', error);
+      setError('Failed to load settings');
+    } finally {
+      setInitialLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchSettings();
+  }, []);
 
   const handleSettingChange = (category, setting, value) => {
     setSettings(prev => ({
@@ -65,12 +75,28 @@ const SystemSettings = () => {
 
   const handleSaveSettings = async () => {
     setLoading(true);
+    setError(null);
+    
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/settings', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ settings })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to save settings');
+      }
+
+      const result = await response.json();
       setMessage({ type: 'success', text: 'Settings saved successfully!' });
       setTimeout(() => setMessage(null), 3000);
     } catch (error) {
+      console.error('Error saving settings:', error);
       setMessage({ type: 'error', text: 'Failed to save settings. Please try again.' });
       setTimeout(() => setMessage(null), 3000);
     } finally {
@@ -85,7 +111,7 @@ const SystemSettings = () => {
           <ServerIcon className="h-8 w-8 text-green-600" />
           <div className="ml-4">
             <p className="text-sm font-medium text-gray-600">Server Status</p>
-            <p className="text-2xl font-bold text-gray-900">Online</p>
+            <p className="text-2xl font-bold text-gray-900">{systemInfo.serverStatus || 'Online'}</p>
           </div>
         </div>
       </div>
@@ -95,7 +121,7 @@ const SystemSettings = () => {
           <CircleStackIcon className="h-8 w-8 text-blue-600" />
           <div className="ml-4">
             <p className="text-sm font-medium text-gray-600">Database</p>
-            <p className="text-2xl font-bold text-gray-900">99.9%</p>
+            <p className="text-2xl font-bold text-gray-900">{systemInfo.database || '99.9%'}</p>
           </div>
         </div>
       </div>
@@ -105,7 +131,7 @@ const SystemSettings = () => {
           <ShieldCheckIcon className="h-8 w-8 text-purple-600" />
           <div className="ml-4">
             <p className="text-sm font-medium text-gray-600">Security</p>
-            <p className="text-2xl font-bold text-gray-900">Secure</p>
+            <p className="text-2xl font-bold text-gray-900">{systemInfo.security || 'Secure'}</p>
           </div>
         </div>
       </div>
@@ -115,7 +141,7 @@ const SystemSettings = () => {
           <DocumentTextIcon className="h-8 w-8 text-orange-600" />
           <div className="ml-4">
             <p className="text-sm font-medium text-gray-600">Logs</p>
-            <p className="text-2xl font-bold text-gray-900">1.2GB</p>
+            <p className="text-2xl font-bold text-gray-900">{systemInfo.logs || '1.2GB'}</p>
           </div>
         </div>
       </div>
@@ -131,7 +157,7 @@ const SystemSettings = () => {
           </label>
           <input
             type="text"
-            value={settings.general.siteName}
+            value={settings.general?.siteName || ''}
             onChange={(e) => handleSettingChange('general', 'siteName', e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
@@ -142,7 +168,7 @@ const SystemSettings = () => {
             Max Users Per Call
           </label>
           <select
-            value={settings.general.maxUsersPerCall}
+            value={settings.general?.maxUsersPerCall || 8}
             onChange={(e) => handleSettingChange('general', 'maxUsersPerCall', parseInt(e.target.value))}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
@@ -159,7 +185,7 @@ const SystemSettings = () => {
           Site Description
         </label>
         <textarea
-          value={settings.general.siteDescription}
+          value={settings.general?.siteDescription || ''}
           onChange={(e) => handleSettingChange('general', 'siteDescription', e.target.value)}
           rows={3}
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -175,7 +201,7 @@ const SystemSettings = () => {
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
-              checked={settings.general.maintenanceMode}
+              checked={settings.general?.maintenanceMode || false}
               onChange={(e) => handleSettingChange('general', 'maintenanceMode', e.target.checked)}
               className="sr-only peer"
             />
@@ -191,7 +217,7 @@ const SystemSettings = () => {
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
-              checked={settings.general.registrationEnabled}
+              checked={settings.general?.registrationEnabled || true}
               onChange={(e) => handleSettingChange('general', 'registrationEnabled', e.target.checked)}
               className="sr-only peer"
             />
@@ -213,7 +239,7 @@ const SystemSettings = () => {
             type="number"
             min="6"
             max="20"
-            value={settings.security.passwordMinLength}
+            value={settings.security?.passwordMinLength || 8}
             onChange={(e) => handleSettingChange('security', 'passwordMinLength', parseInt(e.target.value))}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
@@ -225,7 +251,7 @@ const SystemSettings = () => {
           </label>
           <input
             type="number"
-            value={settings.security.sessionTimeout}
+            value={settings.security?.sessionTimeout || 1440}
             onChange={(e) => handleSettingChange('security', 'sessionTimeout', parseInt(e.target.value))}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
@@ -241,7 +267,7 @@ const SystemSettings = () => {
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
-              checked={settings.security.requireTwoFactor}
+              checked={settings.security?.requireTwoFactor || false}
               onChange={(e) => handleSettingChange('security', 'requireTwoFactor', e.target.checked)}
               className="sr-only peer"
             />
@@ -257,7 +283,7 @@ const SystemSettings = () => {
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
-              checked={settings.security.enableRateLimiting}
+              checked={settings.security?.enableRateLimiting || true}
               onChange={(e) => handleSettingChange('security', 'enableRateLimiting', e.target.checked)}
               className="sr-only peer"
             />
@@ -279,7 +305,7 @@ const SystemSettings = () => {
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
-              checked={settings.notifications.emailEnabled}
+              checked={settings.notifications?.emailEnabled || true}
               onChange={(e) => handleSettingChange('notifications', 'emailEnabled', e.target.checked)}
               className="sr-only peer"
             />
@@ -295,7 +321,7 @@ const SystemSettings = () => {
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
-              checked={settings.notifications.pushEnabled}
+              checked={settings.notifications?.pushEnabled || true}
               onChange={(e) => handleSettingChange('notifications', 'pushEnabled', e.target.checked)}
               className="sr-only peer"
             />
@@ -311,7 +337,7 @@ const SystemSettings = () => {
           <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
-              checked={settings.notifications.adminAlerts}
+              checked={settings.notifications?.adminAlerts || true}
               onChange={(e) => handleSettingChange('notifications', 'adminAlerts', e.target.checked)}
               className="sr-only peer"
             />
@@ -331,7 +357,7 @@ const SystemSettings = () => {
           </label>
           <input
             type="number"
-            value={settings.storage.maxFileSize}
+            value={settings.storage?.maxFileSize || 100}
             onChange={(e) => handleSettingChange('storage', 'maxFileSize', parseInt(e.target.value))}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
@@ -343,7 +369,7 @@ const SystemSettings = () => {
           </label>
           <input
             type="number"
-            value={settings.storage.recordingsRetention}
+            value={settings.storage?.recordingsRetention || 30}
             onChange={(e) => handleSettingChange('storage', 'recordingsRetention', parseInt(e.target.value))}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           />
@@ -356,7 +382,7 @@ const SystemSettings = () => {
         </label>
         <input
           type="text"
-          value={settings.storage.allowedFileTypes.join(', ')}
+          value={(settings.storage?.allowedFileTypes || []).join(', ')}
           onChange={(e) => handleSettingChange('storage', 'allowedFileTypes', e.target.value.split(', '))}
           placeholder="jpg, png, pdf, doc..."
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -379,6 +405,28 @@ const SystemSettings = () => {
         return <GeneralSettings />;
     }
   };
+
+  if (initialLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-md p-4">
+        <div className="text-red-700">{error}</div>
+        <button 
+          onClick={() => fetchSettings()} 
+          className="mt-2 text-sm text-red-600 hover:text-red-800"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

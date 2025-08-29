@@ -10,6 +10,11 @@ const { initializeDatabase, cleanupExpiredStories, cleanupDuplicateCallHistory }
 const authRoutes = require('./routes/auth');
 const socialRoutes = require('./routes/social');
 const callRoutes = require('./routes/calls');
+const contentRoutes = require('./routes/content');
+const analyticsRoutes = require('./routes/analytics');
+const usersRoutes = require('./routes/users');
+const settingsRoutes = require('./routes/settings');
+const contentManagementRoutes = require('./routes/content-management');
 const { authenticateToken } = require('./middleware/auth');
 
 const app = express();
@@ -63,6 +68,17 @@ app.use((req, res, next) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/social', authenticateToken, socialRoutes);
 app.use('/api/calls', authenticateToken, callRoutes);
+app.use('/api/content', contentRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/content-management', contentManagementRoutes);
+
+// Debug middleware to log all requests
+app.use('/api/*', (req, res, next) => {
+  console.log('❓ Unmatched API route:', req.method, req.originalUrl);
+  res.status(404).json({ error: 'API endpoint not found', path: req.originalUrl });
+});
 
 initializeDatabase();
 

@@ -5,7 +5,6 @@ import {
   PhotoIcon,
   TrashIcon,
   EyeIcon,
-  PencilIcon,
   MagnifyingGlassIcon,
   FunnelIcon,
   ExclamationTriangleIcon
@@ -17,105 +16,61 @@ const ContentManagement = () => {
   const [filterType, setFilterType] = useState('all');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const [posts, setPosts] = useState([
-    {
-      id: 1,
-      title: 'Welcome to CallConnect',
-      content: 'This is our first post on the platform...',
-      author: 'john_doe',
-      created_at: '2024-01-15T10:30:00Z',
-      likes: 24,
-      comments: 8,
-      status: 'published',
-      reported: false
-    },
-    {
-      id: 2,
-      title: 'Platform Updates',
-      content: 'We have some exciting new features coming...',
-      author: 'sarah_j',
-      created_at: '2024-01-14T15:45:00Z',
-      likes: 18,
-      comments: 3,
-      status: 'published',
-      reported: true
-    },
-    {
-      id: 3,
-      title: 'Community Guidelines',
-      content: 'Please follow these guidelines when posting...',
-      author: 'admin',
-      created_at: '2024-01-13T09:20:00Z',
-      likes: 45,
-      comments: 12,
-      status: 'pinned',
-      reported: false
-    }
-  ]);
+  const [posts, setPosts] = useState([]);
 
-  const [groups, setGroups] = useState([
-    {
-      id: 1,
-      name: 'Photography Enthusiasts',
-      description: 'Share and discuss photography',
-      members: 156,
-      creator: 'lisa_brown',
-      created_at: '2024-01-10T12:00:00Z',
-      privacy: 'public',
-      reported: false
-    },
-    {
-      id: 2,
-      name: 'Tech Discussions',
-      description: 'All things technology',
-      members: 234,
-      creator: 'mike_wilson',
-      created_at: '2024-01-08T16:30:00Z',
-      privacy: 'public',
-      reported: true
-    },
-    {
-      id: 3,
-      name: 'Book Club',
-      description: 'Monthly book discussions',
-      members: 89,
-      creator: 'emma_davis',
-      created_at: '2024-01-05T14:15:00Z',
-      privacy: 'private',
-      reported: false
-    }
-  ]);
+  const [groups, setGroups] = useState([]);
 
-  const [stories, setStories] = useState([
-    {
-      id: 1,
-      author: 'sarah_j',
-      type: 'image',
-      views: 45,
-      created_at: '2024-01-15T18:30:00Z',
-      expires_at: '2024-01-16T18:30:00Z',
-      reported: false
-    },
-    {
-      id: 2,
-      author: 'mike_wilson',
-      type: 'video',
-      views: 78,
-      created_at: '2024-01-15T14:20:00Z',
-      expires_at: '2024-01-16T14:20:00Z',
-      reported: true
-    },
-    {
-      id: 3,
-      author: 'lisa_brown',
-      type: 'image',
-      views: 32,
-      created_at: '2024-01-15T11:45:00Z',
-      expires_at: '2024-01-16T11:45:00Z',
-      reported: false
+  const [stories, setStories] = useState([]);
+
+  // Fetch data based on active tab
+  const fetchData = async (tab = activeTab) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const token = localStorage.getItem('token');
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      };
+
+      console.log(`🔄 Fetching ${tab} data...`);
+      const timestamp = Date.now();
+      
+      const response = await fetch(`/api/content-management/${tab}?t=${timestamp}`, {
+        headers,
+        cache: 'no-store'
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch ${tab}`);
+      }
+
+      const data = await response.json();
+      console.log(`✅ Fetched ${data.length} ${tab}:`, data);
+
+      if (tab === 'posts') {
+        setPosts(data);
+      } else if (tab === 'groups') {
+        setGroups(data);
+      } else if (tab === 'stories') {
+        setStories(data);
+      }
+    } catch (error) {
+      console.error(`❌ Error fetching ${tab}:`, error);
+      setError(`Failed to load ${tab}`);
+    } finally {
+      setLoading(false);
     }
-  ]);
+  };
+
+  // Fetch data when component mounts and when active tab changes
+  useEffect(() => {
+    fetchData();
+  }, [activeTab]);
 
   const tabs = [
     { id: 'posts', name: 'Posts', icon: DocumentTextIcon, count: posts.length },
@@ -123,16 +78,38 @@ const ContentManagement = () => {
     { id: 'stories', name: 'Stories', icon: PhotoIcon, count: stories.length }
   ];
 
-  const handleDelete = (type, id) => {
-    if (type === 'posts') {
-      setPosts(posts.filter(post => post.id !== id));
-    } else if (type === 'groups') {
-      setGroups(groups.filter(group => group.id !== id));
-    } else if (type === 'stories') {
-      setStories(stories.filter(story => story.id !== id));
+  const handleDelete = async (type, id) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await fetch(`/api/content-management/${type}/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to delete ${type}`);
+      }
+
+      console.log(`✅ Deleted ${type} ${id}`);
+      
+      // Remove from local state
+      if (type === 'posts') {
+        setPosts(posts.filter(post => post.id !== id));
+      } else if (type === 'groups') {
+        setGroups(groups.filter(group => group.id !== id));
+      } else if (type === 'stories') {
+        setStories(stories.filter(story => story.id !== id));
+      }
+    } catch (error) {
+      console.error(`❌ Error deleting ${type}:`, error);
+      alert(`Failed to delete ${type}. Please try again.`);
+    } finally {
+      setShowDeleteModal(false);
+      setSelectedItem(null);
     }
-    setShowDeleteModal(false);
-    setSelectedItem(null);
   };
 
   const formatDate = (dateString) => {
@@ -180,9 +157,6 @@ const ContentManagement = () => {
             <div className="flex items-center space-x-2">
               <button className="p-2 text-gray-400 hover:text-gray-600">
                 <EyeIcon className="w-5 h-5" />
-              </button>
-              <button className="p-2 text-gray-400 hover:text-gray-600">
-                <PencilIcon className="w-5 h-5" />
               </button>
               <button 
                 onClick={() => {
@@ -232,9 +206,6 @@ const ContentManagement = () => {
             <div className="flex items-center space-x-2">
               <button className="p-2 text-gray-400 hover:text-gray-600">
                 <EyeIcon className="w-5 h-5" />
-              </button>
-              <button className="p-2 text-gray-400 hover:text-gray-600">
-                <PencilIcon className="w-5 h-5" />
               </button>
               <button 
                 onClick={() => {
@@ -386,9 +357,27 @@ const ContentManagement = () => {
         </div>
       </div>
 
-      {activeTab === 'posts' && <PostsContent />}
-      {activeTab === 'groups' && <GroupsContent />}
-      {activeTab === 'stories' && <StoriesContent />}
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4">
+          <div className="text-red-700">{error}</div>
+          <button 
+            onClick={() => fetchData()} 
+            className="mt-2 text-sm text-red-600 hover:text-red-800"
+          >
+            Retry
+          </button>
+        </div>
+      ) : (
+        <>
+          {activeTab === 'posts' && <PostsContent />}
+          {activeTab === 'groups' && <GroupsContent />}
+          {activeTab === 'stories' && <StoriesContent />}
+        </>
+      )}
 
       {showDeleteModal && selectedItem && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

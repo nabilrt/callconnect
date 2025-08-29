@@ -441,7 +441,72 @@ const initializeDatabase = () => {
       }
     });
 
+    // Dynamic content tables for admin panel management
+    db.run(`CREATE TABLE IF NOT EXISTS content_sections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      type TEXT NOT NULL CHECK(type IN ('hero', 'features', 'testimonials', 'cta', 'about', 'pricing', 'stats', 'how_it_works', 'security')),
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      button_text TEXT DEFAULT NULL,
+      button_link TEXT DEFAULT NULL,
+      image_url TEXT DEFAULT NULL,
+      background_color TEXT DEFAULT NULL,
+      text_color TEXT DEFAULT NULL,
+      enabled BOOLEAN DEFAULT TRUE,
+      section_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS content_features (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      section_id INTEGER NOT NULL,
+      icon TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT NOT NULL,
+      feature_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (section_id) REFERENCES content_sections(id) ON DELETE CASCADE
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS content_testimonials (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      section_id INTEGER NOT NULL,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL,
+      content TEXT NOT NULL,
+      avatar_url TEXT DEFAULT NULL,
+      company TEXT DEFAULT NULL,
+      rating INTEGER DEFAULT 5,
+      testimonial_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (section_id) REFERENCES content_sections(id) ON DELETE CASCADE
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS content_stats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      section_id INTEGER NOT NULL,
+      label TEXT NOT NULL,
+      value TEXT NOT NULL,
+      icon TEXT DEFAULT NULL,
+      stat_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (section_id) REFERENCES content_sections(id) ON DELETE CASCADE
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS app_settings (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      key TEXT UNIQUE NOT NULL,
+      value TEXT NOT NULL,
+      description TEXT DEFAULT NULL,
+      category TEXT DEFAULT 'general',
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+
     console.log('Database initialized successfully');
+    
+    // Seed default content if none exists
+    seedDefaultContent();
   });
 };
 
@@ -1570,6 +1635,322 @@ const cleanupDuplicateCallHistory = (callback) => {
   });
 };
 
+// ==================== CONTENT MANAGEMENT FUNCTIONS ====================
+
+// Content Sections
+const createContentSection = (sectionData, callback) => {
+  const { type, title, content, button_text, button_link, image_url, background_color, text_color, enabled, section_order } = sectionData;
+  const now = new Date().toISOString();
+  
+  const query = `
+    INSERT INTO content_sections (type, title, content, button_text, button_link, image_url, background_color, text_color, enabled, section_order, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  
+  db.run(query, [type, title, content, button_text, button_link, image_url, background_color, text_color, enabled, section_order, now, now], function(err) {
+    callback(err, { id: this.lastID, ...sectionData, created_at: now, updated_at: now });
+  });
+};
+
+const getContentSections = (callback) => {
+  const query = `SELECT * FROM content_sections ORDER BY section_order ASC, id ASC`;
+  db.all(query, [], callback);
+};
+
+const updateContentSection = (sectionId, updates, callback) => {
+  const now = new Date().toISOString();
+  const fields = Object.keys(updates);
+  const values = Object.values(updates);
+  
+  const setClause = fields.map(field => `${field} = ?`).join(', ');
+  const query = `UPDATE content_sections SET ${setClause}, updated_at = ? WHERE id = ?`;
+  
+  db.run(query, [...values, now, sectionId], callback);
+};
+
+const deleteContentSection = (sectionId, callback) => {
+  const query = `DELETE FROM content_sections WHERE id = ?`;
+  db.run(query, [sectionId], callback);
+};
+
+// Content Features
+const createContentFeature = (featureData, callback) => {
+  const { section_id, icon, title, description, feature_order } = featureData;
+  const now = new Date().toISOString();
+  
+  const query = `
+    INSERT INTO content_features (section_id, icon, title, description, feature_order, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `;
+  
+  db.run(query, [section_id, icon, title, description, feature_order || 0, now], function(err) {
+    callback(err, { id: this.lastID, ...featureData, created_at: now });
+  });
+};
+
+const getContentFeatures = (sectionId, callback) => {
+  const query = `SELECT * FROM content_features WHERE section_id = ? ORDER BY feature_order ASC, id ASC`;
+  db.all(query, [sectionId], callback);
+};
+
+const updateContentFeature = (featureId, updates, callback) => {
+  const fields = Object.keys(updates);
+  const values = Object.values(updates);
+  
+  const setClause = fields.map(field => `${field} = ?`).join(', ');
+  const query = `UPDATE content_features SET ${setClause} WHERE id = ?`;
+  
+  db.run(query, [...values, featureId], callback);
+};
+
+const deleteContentFeature = (featureId, callback) => {
+  const query = `DELETE FROM content_features WHERE id = ?`;
+  db.run(query, [featureId], callback);
+};
+
+// Content Testimonials
+const createContentTestimonial = (testimonialData, callback) => {
+  const { section_id, name, role, content, avatar_url, company, rating, testimonial_order } = testimonialData;
+  const now = new Date().toISOString();
+  
+  const query = `
+    INSERT INTO content_testimonials (section_id, name, role, content, avatar_url, company, rating, testimonial_order, created_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+  
+  db.run(query, [section_id, name, role, content, avatar_url, company, rating || 5, testimonial_order || 0, now], function(err) {
+    callback(err, { id: this.lastID, ...testimonialData, created_at: now });
+  });
+};
+
+const getContentTestimonials = (sectionId, callback) => {
+  const query = `SELECT * FROM content_testimonials WHERE section_id = ? ORDER BY testimonial_order ASC, id ASC`;
+  db.all(query, [sectionId], callback);
+};
+
+const updateContentTestimonial = (testimonialId, updates, callback) => {
+  const fields = Object.keys(updates);
+  const values = Object.values(updates);
+  
+  const setClause = fields.map(field => `${field} = ?`).join(', ');
+  const query = `UPDATE content_testimonials SET ${setClause} WHERE id = ?`;
+  
+  db.run(query, [...values, testimonialId], callback);
+};
+
+const deleteContentTestimonial = (testimonialId, callback) => {
+  const query = `DELETE FROM content_testimonials WHERE id = ?`;
+  db.run(query, [testimonialId], callback);
+};
+
+// Content Stats
+const createContentStat = (statData, callback) => {
+  const { section_id, label, value, icon, stat_order } = statData;
+  const now = new Date().toISOString();
+  
+  const query = `
+    INSERT INTO content_stats (section_id, label, value, icon, stat_order, created_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `;
+  
+  db.run(query, [section_id, label, value, icon, stat_order || 0, now], function(err) {
+    callback(err, { id: this.lastID, ...statData, created_at: now });
+  });
+};
+
+const getContentStats = (sectionId, callback) => {
+  const query = `SELECT * FROM content_stats WHERE section_id = ? ORDER BY stat_order ASC, id ASC`;
+  db.all(query, [sectionId], callback);
+};
+
+const updateContentStat = (statId, updates, callback) => {
+  const fields = Object.keys(updates);
+  const values = Object.values(updates);
+  
+  const setClause = fields.map(field => `${field} = ?`).join(', ');
+  const query = `UPDATE content_stats SET ${setClause} WHERE id = ?`;
+  
+  db.run(query, [...values, statId], callback);
+};
+
+const deleteContentStat = (statId, callback) => {
+  const query = `DELETE FROM content_stats WHERE id = ?`;
+  db.run(query, [statId], callback);
+};
+
+// App Settings
+const getAppSettings = (category = null, callback) => {
+  let query = `SELECT * FROM app_settings`;
+  let params = [];
+  
+  if (category) {
+    query += ` WHERE category = ?`;
+    params.push(category);
+  }
+  
+  query += ` ORDER BY category ASC, key ASC`;
+  db.all(query, params, callback);
+};
+
+const updateAppSetting = (key, value, description = null, category = 'general', callback) => {
+  const now = new Date().toISOString();
+  
+  const query = `
+    INSERT OR REPLACE INTO app_settings (key, value, description, category, updated_at)
+    VALUES (?, ?, ?, ?, ?)
+  `;
+  
+  db.run(query, [key, value, description, category, now], callback);
+};
+
+// Seed Default Content
+const seedDefaultContent = (callback) => {
+  db.serialize(() => {
+    db.get('SELECT COUNT(*) as count FROM content_sections', (err, result) => {
+      if (err || result.count > 0) {
+        if (callback) callback(err);
+        return;
+      }
+      
+      console.log('🌱 Seeding default content...');
+      
+      // Hero Section
+      createContentSection({
+        type: 'hero',
+        title: 'Share, Call & Connect All in One Place',
+        content: 'Make HD voice and video calls, chat in real-time, share posts with photos and videos, track your call history, and build meaningful connections. Everything you need for authentic social interactions in one beautifully designed platform.',
+        button_text: 'Join SocialHub Free',
+        button_link: '/signup',
+        enabled: true,
+        section_order: 1
+      }, () => {});
+      
+      // Features Section
+      createContentSection({
+        type: 'features',
+        title: 'Complete Communication Suite',
+        content: 'Voice calls, video calls, messaging, social posts, and detailed call tracking - all in one platform',
+        enabled: true,
+        section_order: 2
+      }, (err, section) => {
+        if (!err && section) {
+          const features = [
+            { icon: '📞', title: 'HD Voice & Video Calls', description: 'Make crystal-clear audio and video calls to any friend instantly with one-click calling from chat or contacts.' },
+            { icon: '⏰', title: 'Call History & Analytics', description: 'Track all your calls with detailed history, duration tracking, and call analytics. Never miss important call details.' },
+            { icon: '💬', title: 'Real-time Messaging', description: 'Chat instantly with friends and family with our lightning-fast messaging system and rich media sharing.' },
+            { icon: '📸', title: 'Share Your Moments', description: 'Post photos, videos, and updates to keep your network engaged with likes, comments, and reactions.' },
+            { icon: '👥', title: 'Groups & Communities', description: 'Create and join groups, share in group chats, and build communities around your interests and hobbies.' },
+            { icon: '📖', title: 'Stories & Updates', description: 'Share temporary stories that disappear after 24 hours. Express yourself with photos, videos, and quick moments.' }
+          ];
+          
+          features.forEach((feature, index) => {
+            createContentFeature({
+              section_id: section.id,
+              icon: feature.icon,
+              title: feature.title,
+              description: feature.description,
+              feature_order: index + 1
+            }, () => {});
+          });
+        }
+      });
+      
+      // Stats Section
+      createContentSection({
+        type: 'stats',
+        title: 'Trusted by Users Worldwide',
+        content: 'Join thousands of satisfied users who choose SocialHub for their communication needs',
+        enabled: true,
+        section_order: 3
+      }, (err, section) => {
+        if (!err && section) {
+          const stats = [
+            { label: 'Active Users', value: '25K+', icon: '👥' },
+            { label: 'Calls Made', value: '1M+', icon: '📞' },
+            { label: 'Call Quality', value: '99.9%', icon: '⭐' }
+          ];
+          
+          stats.forEach((stat, index) => {
+            createContentStat({
+              section_id: section.id,
+              label: stat.label,
+              value: stat.value,
+              icon: stat.icon,
+              stat_order: index + 1
+            }, () => {});
+          });
+        }
+      });
+      
+      // How It Works Section
+      createContentSection({
+        type: 'how_it_works',
+        title: 'How SocialHub Works',
+        content: 'Get started in three simple steps',
+        enabled: true,
+        section_order: 4
+      }, () => {});
+      
+      // Testimonials Section
+      createContentSection({
+        type: 'testimonials',
+        title: 'What Our Users Say',
+        content: 'Join thousands of satisfied users worldwide',
+        enabled: true,
+        section_order: 5
+      }, (err, section) => {
+        if (!err && section) {
+          const testimonials = [
+            { name: 'Sarah Johnson', role: 'Product Manager', content: 'SocialHub has completely transformed how I connect with my friends. The HD voice calls, messaging, and call history tracking make it easy to stay in touch with everyone.', rating: 5 },
+            { name: 'Michael Chen', role: 'Designer', content: 'I love the video calling feature and creating posts with photos! The call history helps me track important conversations. The groups feature keeps me connected with my hobbies.', rating: 5 },
+            { name: 'Emily Rodriguez', role: 'Marketing Director', content: 'The stories feature and one-click calling are amazing! My call history shows all my important conversations. Love how everything is integrated in one beautiful interface!', rating: 5 }
+          ];
+          
+          testimonials.forEach((testimonial, index) => {
+            createContentTestimonial({
+              section_id: section.id,
+              name: testimonial.name,
+              role: testimonial.role,
+              content: testimonial.content,
+              rating: testimonial.rating,
+              testimonial_order: index + 1
+            }, () => {});
+          });
+        }
+      });
+      
+      // Security Section
+      createContentSection({
+        type: 'security',
+        title: 'Your Privacy & Security Matter',
+        content: 'At SocialHub, we prioritize your privacy and security above all else. Our platform uses industry-leading encryption and security measures to protect your calls, conversations, and personal data.',
+        enabled: true,
+        section_order: 6
+      }, () => {});
+      
+      // CTA Section
+      createContentSection({
+        type: 'cta',
+        title: 'Ready to join the conversation?',
+        content: 'Create your account today and start connecting with friends instantly.',
+        button_text: 'Get Started Now',
+        button_link: '/signup',
+        enabled: true,
+        section_order: 7
+      }, () => {});
+      
+      // Seed app settings
+      updateAppSetting('site_title', 'SocialHub', 'The title of the application', 'general', () => {});
+      updateAppSetting('site_description', 'Share, Call & Connect All in One Place', 'Site description for SEO', 'general', () => {});
+      updateAppSetting('brand_color', '#4F46E5', 'Primary brand color', 'appearance', () => {});
+      updateAppSetting('footer_text', '© 2024 SocialHub. All rights reserved. Made with ❤️ for meaningful connections.', 'Footer copyright text', 'general', () => {});
+      
+      console.log('✅ Default content seeded successfully');
+      if (callback) callback(null);
+    });
+  });
+};
+
 
 module.exports = {
   db,
@@ -1642,5 +2023,26 @@ module.exports = {
   getUserCallHistory,
   deleteCallHistory,
   clearUserCallHistory,
-  cleanupDuplicateCallHistory
+  cleanupDuplicateCallHistory,
+  
+  // Content Management Functions
+  createContentSection,
+  getContentSections,
+  updateContentSection,
+  deleteContentSection,
+  createContentFeature,
+  getContentFeatures,
+  updateContentFeature,
+  deleteContentFeature,
+  createContentTestimonial,
+  getContentTestimonials,
+  updateContentTestimonial,
+  deleteContentTestimonial,
+  createContentStat,
+  getContentStats,
+  updateContentStat,
+  deleteContentStat,
+  getAppSettings,
+  updateAppSetting,
+  seedDefaultContent
 };
