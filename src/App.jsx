@@ -10,6 +10,8 @@ import HelpPage from './pages/HelpPage';
 import PrivacyPage from './pages/PrivacyPage';
 import TermsPage from './pages/TermsPage';
 import SecurityPage from './pages/SecurityPage';
+import AdminDashboard from './pages/AdminDashboard';
+import AdminLogin from './components/admin/AdminLogin';
 import Logo from './components/ui/Logo';
 
 const TitleUpdater = () => {
@@ -34,7 +36,7 @@ const TitleUpdater = () => {
 };
 
 const AppContent = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, isAdmin, loading } = useAuth();
 
   if (loading) {
     return (
@@ -53,20 +55,29 @@ const AppContent = () => {
   return (
     <Router>
       <TitleUpdater />
-      {isAuthenticated ? (
-        <DashboardPage />
-      ) : (
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/features" element={<FeaturesPage />} />
-          <Route path="/contact" element={<ContactPage />} />
-          <Route path="/help" element={<HelpPage />} />
-          <Route path="/privacy" element={<PrivacyPage />} />
-          <Route path="/terms" element={<TermsPage />} />
-          <Route path="/security" element={<SecurityPage />} />
-        </Routes>
-      )}
+      <Routes>
+        {/* Admin Routes */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin" element={
+          isAuthenticated && isAdmin ? <AdminDashboard /> : <AdminLogin />
+        } />
+        
+        {/* Regular User Routes */}
+        {isAuthenticated ? (
+          <Route path="/*" element={<DashboardPage />} />
+        ) : (
+          <>
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="/features" element={<FeaturesPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/help" element={<HelpPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/security" element={<SecurityPage />} />
+          </>
+        )}
+      </Routes>
     </Router>
   );
 };

@@ -181,6 +181,9 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Check if current user is admin
+  const isAdmin = user && user.email === 'admin@socialhub.com';
+
   const value = {
     user,
     token,
@@ -192,6 +195,7 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateAvatar,
     isAuthenticated: !!token && !!user,
+    isAdmin,
   };
 
   return (
